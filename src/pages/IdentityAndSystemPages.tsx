@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { type FormEvent, useState } from 'react'
 import CheckCircleOutline from '@mui/icons-material/CheckCircleOutline'
 import CloudOffOutlined from '@mui/icons-material/CloudOffOutlined'
 import ErrorOutline from '@mui/icons-material/ErrorOutline'
@@ -20,21 +20,55 @@ import {
   TextField,
   Typography,
 } from '@mui/material'
-import { Link as RouterLink } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { BrandLogo } from '../components/BrandLogo'
 import { useSiteSettings } from '../app/SiteSettingsContext'
 import { AppFooter } from '../components/AppFooter'
+import { DEMO_MFA_CODE, sanitizeReturnTo, useAuth } from '../app/AuthContext'
 
 type IdentityMode = 'login' | 'mfa' | 'denied' | 'expired'
 
 export function IdentityPage({ mode }: { mode: IdentityMode }) {
   const { branding } = useSiteSettings()
+  const { login, logout, verifyMfa } = useAuth()
+  const location = useLocation()
+  const navigate = useNavigate()
+  const [code, setCode] = useState('')
+  const [rememberDevice, setRememberDevice] = useState(false)
+  const [verificationError, setVerificationError] = useState('')
+  const [accessRequested, setAccessRequested] = useState(false)
+  const returnTo = sanitizeReturnTo(new URLSearchParams(location.search).get('returnTo'))
   const content = {
     login: { icon: <Fingerprint />, title: `Connexion à ${branding.applicationName}`, text: `Utilisez votre compte professionnel ${branding.organizationName}. Aucun mot de passe distinct n’est stocké par ${branding.applicationName}.` },
     mfa: { icon: <LockOutlined />, title: 'Vérification renforcée', text: 'Saisissez le code à six chiffres de votre application d’authentification.' },
     denied: { icon: <ErrorOutline />, title: 'Accès non autorisé', text: `Votre identité est reconnue, mais aucun rôle ${branding.applicationName} ne vous permet d’accéder à cette ressource.` },
     expired: { icon: <HourglassEmpty />, title: 'Session expirée', text: 'Votre session a expiré pour protéger vos informations. Reconnectez-vous pour continuer.' },
   }[mode]
+
+  const beginLogin = () => {
+    login()
+    navigate(`/mfa?returnTo=${encodeURIComponent(returnTo)}`)
+  }
+
+  const submitMfa = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!verifyMfa(code)) {
+      setVerificationError('Code incorrect. Utilisez le code de démonstration indiqué ci-dessous.')
+      return
+    }
+    navigate(returnTo, { replace: true })
+  }
+
+  const reconnect = () => {
+    logout()
+    navigate(`/connexion?returnTo=${encodeURIComponent(returnTo)}`, { replace: true })
+  }
+
+  const changeAccount = () => {
+    logout()
+    navigate('/connexion', { replace: true })
+  }
+
   return (
     <Box sx={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', bgcolor: 'primary.dark', backgroundImage: 'radial-gradient(circle at 80% 20%, rgba(32,196,199,.18), transparent 35%)' }}>
       <Box sx={{ flex: 1, display: 'grid', placeItems: 'center', p: 2 }}>
@@ -43,10 +77,40 @@ export function IdentityPage({ mode }: { mode: IdentityMode }) {
           <Avatar sx={{ bgcolor: mode === 'denied' ? 'error.light' : 'primary.main', color: mode === 'denied' ? 'error.dark' : 'white', mb: 2 }}>{content.icon}</Avatar>
           <Typography component="h1" variant="h1">{content.title}</Typography>
           <Typography color="text.secondary" sx={{ mt: 1 }}>{content.text}</Typography>
-          {mode === 'login' ? <Button component={RouterLink} to="/" fullWidth variant="contained" size="large" startIcon={<Fingerprint />} sx={{ mt: 3 }}>Se connecter avec {branding.organizationName}</Button> : null}
-          {mode === 'mfa' ? <Box sx={{ mt: 3 }}><TextField fullWidth autoFocus label="Code de vérification" inputProps={{ inputMode: 'numeric', maxLength: 6 }} /><FormControlLabel control={<Checkbox />} label="Mémoriser cet appareil pendant 8 heures" /><Button component={RouterLink} to="/" fullWidth variant="contained" sx={{ mt: 1 }}>Vérifier</Button></Box> : null}
-          {mode === 'denied' ? <Stack spacing={1} sx={{ mt: 3 }}><Button variant="contained">Demander un accès</Button><Button component={RouterLink} to="/connexion">Changer de compte</Button></Stack> : null}
-          {mode === 'expired' ? <Button component={RouterLink} to="/connexion" fullWidth variant="contained" sx={{ mt: 3 }}>Se reconnecter</Button> : null}
+          {mode === 'login' ? (
+            <Stack spacing={1.5} sx={{ mt: 3 }}>
+              <Button fullWidth variant="contained" size="large" startIcon={<Fingerprint />} onClick={beginLogin}>Se connecter avec {branding.organizationName}</Button>
+              <Typography variant="caption" color="text.secondary" textAlign="center">Connexion SSO simulée pour le prototype UI</Typography>
+            </Stack>
+          ) : null}
+          {mode === 'mfa' ? (
+            <Box component="form" onSubmit={submitMfa} sx={{ mt: 3 }} noValidate>
+              {verificationError ? <Alert severity="error" sx={{ mb: 2 }}>{verificationError}</Alert> : null}
+              <TextField
+                fullWidth
+                autoFocus
+                label="Code de vérification"
+                value={code}
+                error={Boolean(verificationError)}
+                helperText={`Code de démonstration : ${DEMO_MFA_CODE}`}
+                onChange={(event) => {
+                  setCode(event.target.value.replace(/\D/g, '').slice(0, 6))
+                  setVerificationError('')
+                }}
+                slotProps={{ htmlInput: { inputMode: 'numeric', maxLength: 6, autoComplete: 'one-time-code' } }}
+              />
+              <FormControlLabel control={<Checkbox checked={rememberDevice} onChange={(event) => setRememberDevice(event.target.checked)} />} label="Mémoriser cet appareil pendant 8 heures" />
+              <Button type="submit" fullWidth variant="contained" disabled={code.length !== 6} sx={{ mt: 1 }}>Vérifier</Button>
+            </Box>
+          ) : null}
+          {mode === 'denied' ? (
+            <Stack spacing={1} sx={{ mt: 3 }}>
+              {accessRequested ? <Alert severity="success">Votre demande d’accès a été transmise à un administrateur.</Alert> : null}
+              <Button variant="contained" disabled={accessRequested} onClick={() => setAccessRequested(true)}>Demander un accès</Button>
+              <Button onClick={changeAccount}>Changer de compte</Button>
+            </Stack>
+          ) : null}
+          {mode === 'expired' ? <Button fullWidth variant="contained" sx={{ mt: 3 }} onClick={reconnect}>Se reconnecter</Button> : null}
           <Divider sx={{ my: 3 }} />
           <Typography variant="caption" color="text.secondary">Besoin d’aide ? Contactez le support DSI · Référence de session NUMA-2026-0815</Typography>
         </Card>

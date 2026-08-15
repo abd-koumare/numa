@@ -3,8 +3,11 @@ import userEvent from '@testing-library/user-event'
 import { CssBaseline, ThemeProvider } from '@mui/material'
 import { App } from './App'
 import { numaTheme } from './theme'
+import { AUTH_STORAGE_KEY, sanitizeReturnTo, serializeDemoAuthSession } from './AuthContext'
 
-function renderApp(path = '/') {
+function renderApp(path = '/', authenticated = true) {
+  if (authenticated) window.localStorage.setItem(AUTH_STORAGE_KEY, serializeDemoAuthSession('2026-08-15T12:00:00.000Z'))
+  else window.localStorage.removeItem(AUTH_STORAGE_KEY)
   window.history.pushState({}, '', path)
   return render(
     <ThemeProvider theme={numaTheme}>
@@ -34,11 +37,68 @@ describe('NUMA application shell', () => {
   })
 
   it('shows the global legal footer on public identity screens', () => {
-    renderApp('/connexion')
+    renderApp('/connexion', false)
 
     expect(screen.getByTestId('app-footer')).toBeInTheDocument()
     expect(screen.getByText('© 2026 NUMA — Tous droits réservés à Koogin SAS')).toBeInTheDocument()
     expect(screen.getByText('Prototype UI v0.3.0')).toBeInTheDocument()
+  })
+
+  it('redirects anonymous visitors to the login page and preserves their destination', () => {
+    renderApp('/courriers/externes?view=drafts', false)
+
+    expect(screen.getByRole('heading', { name: 'Connexion à NUMA', level: 1 })).toBeInTheDocument()
+    expect(window.location.pathname).toBe('/connexion')
+    expect(new URLSearchParams(window.location.search).get('returnTo')).toBe('/courriers/externes?view=drafts')
+  })
+
+  it('accepts only internal application paths as a post-login destination', () => {
+    expect(sanitizeReturnTo('/courriers/internes?view=drafts')).toBe('/courriers/internes?view=drafts')
+    expect(sanitizeReturnTo('https://example.com')).toBe('/')
+    expect(sanitizeReturnTo('//example.com')).toBe('/')
+    expect(sanitizeReturnTo('/mfa?returnTo=/administration')).toBe('/')
+  })
+
+  it('completes the SSO and MFA journey before returning to the requested page', async () => {
+    const user = userEvent.setup()
+    renderApp('/courriers/externes?view=drafts', false)
+
+    await user.click(screen.getByRole('button', { name: 'Se connecter avec ORGATECH' }))
+    expect(screen.getByRole('heading', { name: 'Vérification renforcée', level: 1 })).toBeInTheDocument()
+
+    const codeInput = screen.getByLabelText('Code de vérification')
+    await user.type(codeInput, '000000')
+    await user.click(screen.getByRole('button', { name: 'Vérifier' }))
+    expect(screen.getByRole('alert')).toHaveTextContent('Code incorrect')
+
+    await user.clear(codeInput)
+    await user.type(codeInput, '123456')
+    await user.click(screen.getByRole('button', { name: 'Vérifier' }))
+
+    expect(screen.getByRole('heading', { name: 'Courriers externes 2026', level: 1 })).toBeInTheDocument()
+    expect(window.location.pathname).toBe('/courriers/externes')
+    expect(window.location.search).toBe('?view=drafts')
+    expect(window.localStorage.getItem(AUTH_STORAGE_KEY)).not.toBeNull()
+  })
+
+  it('logs out from the profile menu and clears the persisted session', async () => {
+    const user = userEvent.setup()
+    renderApp()
+
+    await user.click(screen.getByRole('button', { name: 'Ouvrir le menu du profil' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Se déconnecter' }))
+
+    expect(screen.getByRole('heading', { name: 'Connexion à NUMA', level: 1 })).toBeInTheDocument()
+    expect(window.localStorage.getItem(AUTH_STORAGE_KEY)).toBeNull()
+  })
+
+  it('confirms that an access request was sent', async () => {
+    const user = userEvent.setup()
+    renderApp('/acces-refuse', false)
+
+    await user.click(screen.getByRole('button', { name: 'Demander un accès' }))
+    expect(screen.getByRole('alert')).toHaveTextContent('transmise à un administrateur')
+    expect(screen.getByRole('button', { name: 'Demander un accès' })).toBeDisabled()
   })
 
   it('reveals chart values on hover and updates them with the selected period', async () => {
@@ -191,7 +251,7 @@ describe('NUMA application shell', () => {
 
   it('configures and previews numbering by responsible service', async () => {
     const user = userEvent.setup()
-    renderApp('/administration/listes')
+    renderApp('/administration/listes/courriers-externes')
 
     await user.click(screen.getByRole('button', { name: 'Numérotation' }))
     expect(screen.getByLabelText(/Format du numéro/)).toHaveValue('{SERVICE}/{SEQUENCE:0000}/{ANNEE}')
@@ -214,5 +274,41 @@ describe('NUMA application shell', () => {
     await user.click(screen.getByRole('combobox', { name: 'Service responsable' }))
     await user.click(screen.getByRole('option', { name: /FIN — Direction financière/ }))
     expect(screen.getByTestId('creation-numbering-preview')).toHaveTextContent('FIN/0053/2026')
+  })
+
+  it('covers access management from the directory to effective permissions', async () => {
+    const user = userEvent.setup()
+    renderApp('/administration/utilisateurs')
+
+    expect(screen.getByRole('heading', { name: 'Utilisateurs', level: 1 })).toBeInTheDocument()
+    await user.click(screen.getByRole('link', { name: 'Ajouter depuis l’annuaire' }))
+    expect(screen.getByRole('heading', { name: 'Ajouter un utilisateur', level: 1 })).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Utilisateur Active Directory' })).toBeInTheDocument()
+  })
+
+  it('opens list, rule, page and workflow builders from their catalogs', () => {
+    const routes = [
+      ['/administration/listes', 'Listes métier'],
+      ['/administration/regles', 'Règles métier'],
+      ['/administration/pages', 'Pages'],
+      ['/administration/workflows', 'Workflows'],
+      ['/administration/templates', 'Templates'],
+    ] as const
+
+    routes.forEach(([path, heading]) => {
+      const view = renderApp(path)
+      expect(screen.getByRole('heading', { name: heading, level: 1 })).toBeInTheDocument()
+      view.unmount()
+    })
+  })
+
+  it('marks all notifications as read', async () => {
+    const user = userEvent.setup()
+    renderApp('/notifications')
+
+    expect(screen.getByRole('heading', { name: 'Notifications', level: 1 })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Tout marquer comme lu' }))
+    await user.click(screen.getByRole('tab', { name: /Non lues/ }))
+    expect(screen.getByRole('heading', { name: 'Aucune notification' })).toBeInTheDocument()
   })
 })

@@ -88,7 +88,7 @@ export const numaTheme = createTheme({
     MuiButton: {
       defaultProps: { disableElevation: true },
       styleOverrides: {
-        root: { minHeight: 40, borderRadius: 8, paddingInline: 16 },
+        root: { minHeight: 40, height: 'fit-content', borderRadius: 8, paddingInline: 16 },
       },
     },
     MuiCard: {

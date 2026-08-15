@@ -9,6 +9,13 @@ export const defaultBrandingSettings: SiteBrandingSettings = {
   logoDataUrl: null,
   logoFileName: null,
   logoMimeType: null,
+  faviconDataUrl: null,
+  primaryColor: '#123E7C',
+  accentColor: '#20C4C7',
+  bannerUrl: '',
+  fontFamily: 'NUMA',
+  footerText: 'Tous droits réservés à Koogin SAS',
+  defaultHome: 'dashboard',
 }
 
 export const defaultNumberingSettings: NumberingSettings = {
@@ -59,6 +66,21 @@ export function SiteSettingsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
   }, [state])
+
+  useEffect(() => {
+    document.title = `${state.branding.applicationName} — ${state.branding.organizationName}`
+    document.documentElement.style.setProperty('--numa-primary', state.branding.primaryColor)
+    document.documentElement.style.setProperty('--numa-accent', state.branding.accentColor)
+    let favicon = document.querySelector<HTMLLinkElement>('link[rel="icon"]')
+    if (state.branding.faviconDataUrl) {
+      if (!favicon) {
+        favicon = document.createElement('link')
+        favicon.rel = 'icon'
+        document.head.appendChild(favicon)
+      }
+      favicon.href = state.branding.faviconDataUrl
+    }
+  }, [state.branding])
 
   const value = useMemo<SiteSettingsContextValue>(() => ({
     ...state,

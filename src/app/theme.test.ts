@@ -19,4 +19,9 @@ describe('NUMA theme', () => {
     expect(numaTheme.fontFamilies.mono).toContain('IBM Plex Mono')
     expect(numaTheme.typography.fontFamily).not.toContain('Inter')
   })
+
+  it('allows content links to grow without losing the standard action minimum', () => {
+    const buttonRoot = numaTheme.components?.MuiButton?.styleOverrides?.root
+    expect(buttonRoot).toMatchObject({ minHeight: 40, height: 'fit-content' })
+  })
 })

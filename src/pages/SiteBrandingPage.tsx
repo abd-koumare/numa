@@ -9,6 +9,7 @@ import {
   Card,
   Chip,
   Divider,
+  MenuItem,
   Snackbar,
   Stack,
   TextField,
@@ -54,6 +55,19 @@ export function SiteBrandingPage() {
       setError('')
     }
     reader.onerror = () => setError('Le fichier n’a pas pu être lu. Réessayez avec un autre logo.')
+    reader.readAsDataURL(file)
+  }
+
+  const chooseFavicon = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    if (!['image/png', 'image/svg+xml'].includes(file.type) || file.size > 512 * 1024) {
+      setError('Le favicon doit être un fichier PNG ou SVG de 512 Ko maximum.')
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = () => setDraft((current) => ({ ...current, faviconDataUrl: String(reader.result) }))
     reader.readAsDataURL(file)
   }
 
@@ -117,6 +131,18 @@ export function SiteBrandingPage() {
               {draft.logoFileName ? <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1.5 }}><Chip label={draft.logoMimeType === 'image/svg+xml' ? 'SVG' : 'PNG'} size="small" color="success" variant="outlined" /><Typography variant="caption" color="text.secondary">{draft.logoFileName}</Typography></Stack> : null}
               {error ? <Alert severity="error" sx={{ mt: 1.5 }}>{error}</Alert> : null}
             </Box>
+            <Divider />
+            <Typography component="h3" variant="h3">Thème et expérience</Typography>
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
+              <TextField type="color" label="Couleur principale" value={draft.primaryColor} onChange={(event) => setDraft((current) => ({ ...current, primaryColor: event.target.value }))} slotProps={{ inputLabel: { shrink: true } }} />
+              <TextField type="color" label="Couleur d’accent" value={draft.accentColor} onChange={(event) => setDraft((current) => ({ ...current, accentColor: event.target.value }))} slotProps={{ inputLabel: { shrink: true } }} />
+            </Box>
+            <TextField label="Image ou bannière d’accueil" value={draft.bannerUrl} onChange={(event) => setDraft((current) => ({ ...current, bannerUrl: event.target.value }))} placeholder="https://…" />
+            <TextField select label="Typographie" value={draft.fontFamily} onChange={(event) => setDraft((current) => ({ ...current, fontFamily: event.target.value as SiteBrandingSettings['fontFamily'] }))}><MenuItem value="NUMA">Typographie NUMA</MenuItem><MenuItem value="Organisation">Typographie de l’organisation</MenuItem></TextField>
+            <TextField select label="Page d’accueil par défaut" value={draft.defaultHome} onChange={(event) => setDraft((current) => ({ ...current, defaultHome: event.target.value as SiteBrandingSettings['defaultHome'] }))}><MenuItem value="dashboard">Tableau de bord</MenuItem><MenuItem value="tasks">Mes tâches</MenuItem><MenuItem value="correspondence">Courriers</MenuItem></TextField>
+            <TextField label="Mention de pied de page" value={draft.footerText} onChange={(event) => setDraft((current) => ({ ...current, footerText: event.target.value }))} />
+            <Button component="label" variant="outlined" startIcon={<CloudUploadOutlined />}>Importer un favicon<input aria-label="Choisir un favicon PNG ou SVG" hidden type="file" accept=".png,.svg,image/png,image/svg+xml" onChange={chooseFavicon} /></Button>
+            {draft.faviconDataUrl ? <Chip label="Favicon prêt à être publié" color="success" variant="outlined" /> : null}
           </Stack>
         </Card>
 

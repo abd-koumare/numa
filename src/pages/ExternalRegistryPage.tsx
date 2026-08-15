@@ -5,6 +5,7 @@ import AttachFileOutlined from '@mui/icons-material/AttachFileOutlined'
 import ErrorOutline from '@mui/icons-material/ErrorOutline'
 import FileDownloadOutlined from '@mui/icons-material/FileDownloadOutlined'
 import FileUploadOutlined from '@mui/icons-material/FileUploadOutlined'
+import FilterAltOutlined from '@mui/icons-material/FilterAltOutlined'
 import InboxOutlined from '@mui/icons-material/InboxOutlined'
 import LockOutlined from '@mui/icons-material/LockOutlined'
 import RestartAlt from '@mui/icons-material/RestartAlt'
@@ -42,14 +43,16 @@ import { externalCorrespondences } from '../data/correspondences'
 import type { BusinessStatus, Correspondence, Priority } from '../types/ui'
 
 const PAGE_SIZE = 10
-const statuses: BusinessStatus[] = ['À traiter', 'En validation', 'Validé', 'Brouillon', 'Rejeté', 'Signé']
+const statuses: BusinessStatus[] = ['À traiter', 'En validation', 'Validé', 'Brouillon', 'Rejeté', 'Annulé', 'Signé']
 const priorities: Priority[] = ['Basse', 'Normale', 'Haute', 'Urgente']
 const dateFormatter = new Intl.DateTimeFormat('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })
 
-type RegistryView = 'all' | 'todo' | 'validation' | 'validated' | 'drafts'
+type RegistryView = 'all' | 'mine' | 'grouped' | 'todo' | 'validation' | 'validated' | 'drafts'
 
 const views: Array<{ value: RegistryView; label: string }> = [
   { value: 'all', label: 'Tous' },
+  { value: 'mine', label: 'Mes courriers' },
+  { value: 'grouped', label: 'Groupés par direction' },
   { value: 'todo', label: 'À traiter' },
   { value: 'validation', label: 'En validation' },
   { value: 'validated', label: 'Validés' },
@@ -61,11 +64,64 @@ function isRegistryView(value: string | null): value is RegistryView {
 }
 
 function matchesView(item: Correspondence, view: RegistryView) {
+  if (view === 'mine') return item.direction === 'DSI'
   if (view === 'todo') return item.status === 'À traiter'
   if (view === 'validation') return item.status === 'En validation'
   if (view === 'validated') return item.status === 'Validé' || item.status === 'Signé'
   if (view === 'drafts') return item.status === 'Brouillon'
   return true
+}
+
+function GroupedRegistry({ items, basePath }: { items: Correspondence[]; basePath: string }) {
+  const groups = [...new Set(items.map((item) => item.direction))].sort()
+  return (
+    <Stack spacing={1.5} aria-label="Courriers groupés par direction">
+      {groups.map((direction) => {
+        const groupItems = items.filter((item) => item.direction === direction)
+        return (
+          <Card key={direction} component="section" aria-labelledby={`direction-${direction}`}>
+            <Box sx={{ p: 2, bgcolor: 'action.hover' }}>
+              <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
+                <Typography id={`direction-${direction}`} component="h2" variant="h3">{direction}</Typography>
+                <Chip label={`${groupItems.length} courrier${groupItems.length > 1 ? 's' : ''}`} size="small" />
+              </Stack>
+            </Box>
+            <Divider />
+            <Stack divider={<Divider flexItem />}>
+              {groupItems.map((item) => (
+                <Button
+                  key={item.id}
+                  component={RouterLink}
+                  to={`${basePath}/${item.id}`}
+                  color="inherit"
+                  data-testid="grouped-correspondence-row"
+                  sx={{
+                    height: 'auto',
+                    minHeight: 78,
+                    alignSelf: 'stretch',
+                    display: 'grid',
+                    gridTemplateColumns: { xs: 'minmax(0, 1fr)', sm: 'minmax(0, 1fr) auto' },
+                    alignItems: 'center',
+                    gap: { xs: 1, sm: 2 },
+                    p: 2,
+                    textAlign: 'left',
+                    textTransform: 'none',
+                  }}
+                >
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography sx={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 12, color: 'primary.main' }}>{item.reference}</Typography>
+                    <Typography variant="body2" fontWeight={700} sx={{ overflowWrap: 'anywhere' }}>{item.subject}</Typography>
+                    <Typography variant="caption" color="text.secondary" display="block">{item.sender}</Typography>
+                  </Box>
+                  <Box sx={{ justifySelf: { xs: 'start', sm: 'end' } }}><StatusChip status={item.status} /></Box>
+                </Button>
+              ))}
+            </Stack>
+          </Card>
+        )
+      })}
+    </Stack>
+  )
 }
 
 function formatDate(value: string) {
@@ -143,14 +199,18 @@ export function CorrespondenceRegistryPage({ items, config }: CorrespondenceRegi
   const [searchParams, setSearchParams] = useSearchParams()
   const [loading, setLoading] = useState(true)
   const [exported, setExported] = useState(false)
+  const [advancedOpen, setAdvancedOpen] = useState(false)
   const query = searchParams.get('q') ?? ''
   const direction = searchParams.get('direction') ?? ''
   const status = searchParams.get('status') ?? ''
   const priority = searchParams.get('priority') ?? ''
+  const confidentiality = searchParams.get('confidentiality') ?? ''
+  const from = searchParams.get('from') ?? ''
+  const to = searchParams.get('to') ?? ''
   const viewParam = searchParams.get('view')
   const view: RegistryView = isRegistryView(viewParam) ? viewParam : 'all'
   const requestedPage = Number.parseInt(searchParams.get('page') ?? '1', 10)
-  const hasFilters = Boolean(query || direction || status || priority || view !== 'all')
+  const hasFilters = Boolean(query || direction || status || priority || confidentiality || from || to || view !== 'all')
   const forcedError = searchParams.get('state') === 'error'
   const paramsKey = searchParams.toString()
 
@@ -179,10 +239,13 @@ export function CorrespondenceRegistryPage({ items, config }: CorrespondenceRegi
         (!direction || item.direction === direction) &&
         (!status || item.status === status) &&
         (!priority || item.priority === priority) &&
+        (!confidentiality || item.confidentiality === confidentiality) &&
+        (!from || item.receivedAt >= from) &&
+        (!to || item.receivedAt <= to) &&
         matchesView(item, view)
       )
     })
-  }, [direction, items, priority, query, status, view])
+  }, [confidentiality, direction, from, items, priority, query, status, to, view])
 
   const directions = useMemo(() => [...new Set(items.map((item) => item.direction))].sort(), [items])
 
@@ -248,7 +311,9 @@ export function CorrespondenceRegistryPage({ items, config }: CorrespondenceRegi
             {priorities.map((item) => <MenuItem key={item} value={item}>{item}</MenuItem>)}
           </TextField>
           <Button startIcon={<RestartAlt />} onClick={resetFilters} disabled={!hasFilters} sx={{ whiteSpace: 'nowrap' }}>Réinitialiser</Button>
+          <Button startIcon={<FilterAltOutlined />} onClick={() => setAdvancedOpen((value) => !value)} aria-expanded={advancedOpen} sx={{ whiteSpace: 'nowrap' }}>Filtres avancés</Button>
         </Box>
+        {advancedOpen ? <Box sx={{ px: 2, pb: 2, display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' }, gap: 1.5 }}><TextField select size="small" label="Confidentialité" value={confidentiality} onChange={(event) => updateParam('confidentiality', event.target.value)}><MenuItem value="">Toutes</MenuItem><MenuItem value="Standard">Standard</MenuItem><MenuItem value="Restreint">Restreint</MenuItem><MenuItem value="Confidentiel">Confidentiel</MenuItem></TextField><TextField type="date" size="small" label="Reçu depuis le" value={from} onChange={(event) => updateParam('from', event.target.value)} slotProps={{ inputLabel: { shrink: true } }} /><TextField type="date" size="small" label="Reçu jusqu’au" value={to} onChange={(event) => updateParam('to', event.target.value)} slotProps={{ inputLabel: { shrink: true } }} /></Box> : null}
         <Box
           data-testid="registry-loading-slot"
           aria-hidden={!loading}
@@ -267,6 +332,8 @@ export function CorrespondenceRegistryPage({ items, config }: CorrespondenceRegi
         </Alert>
       ) : !loading && !pageItems.length ? (
         <EmptyState filtered={hasFilters} onReset={resetFilters} />
+      ) : view === 'grouped' ? (
+        <GroupedRegistry items={filteredItems} basePath={config.basePath} />
       ) : (
         <Card aria-busy={loading}>
           <Box sx={{ display: { xs: 'none', md: 'block' } }}>

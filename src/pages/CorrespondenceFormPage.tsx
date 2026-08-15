@@ -24,7 +24,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material'
-import { Link as RouterLink, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link as RouterLink, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { correspondenceDirections } from '../data/correspondences'
 import { formatCorrespondenceReference, useSiteSettings } from '../app/SiteSettingsContext'
 
@@ -38,6 +38,8 @@ const responsibleServices = [
 
 export function CorrespondenceFormPage() {
   const navigate = useNavigate()
+  const { id } = useParams()
+  const editing = Boolean(id)
   const [searchParams] = useSearchParams()
   const [saved, setSaved] = useState(false)
   const [submitted, setSubmitted] = useState(false)
@@ -46,6 +48,8 @@ export function CorrespondenceFormPage() {
   const [serviceCode, setServiceCode] = useState('DSI')
   const { numbering } = useSiteSettings()
   const simulatedReference = formatCorrespondenceReference(numbering, serviceCode, { type: type.toLocaleUpperCase('fr'), direction: 'DT' })
+  const registryPath = type === 'interne' ? '/courriers/internes' : '/courriers/externes'
+  const returnPath = editing ? `${registryPath}/${id}` : registryPath
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -56,21 +60,21 @@ export function CorrespondenceFormPage() {
     <Box component="form" onSubmit={handleSubmit} sx={{ maxWidth: 1240, mx: 'auto', px: { xs: 2, sm: 3, lg: 4 }, py: { xs: 3, md: 4 } }}>
       <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ md: 'flex-start' }} spacing={2.5} sx={{ mb: 3 }}>
         <Box>
-          <Button component={RouterLink} to="/courriers/externes" startIcon={<ArrowBack />} sx={{ px: 0, mb: 1 }}>
+          <Button component={RouterLink} to={returnPath} startIcon={<ArrowBack />} sx={{ px: 0, mb: 1 }}>
             Retour au registre
           </Button>
           <Stack direction="row" alignItems="center" spacing={1.25} flexWrap="wrap">
-            <Typography component="h1" variant="h1">Nouveau courrier</Typography>
-            <Chip label="Brouillon non enregistré" size="small" variant="outlined" />
+            <Typography component="h1" variant="h1">{editing ? 'Modifier le courrier' : 'Nouveau courrier'}</Typography>
+            <Chip label={editing ? 'Version en modification' : 'Brouillon non enregistré'} size="small" variant="outlined" />
           </Stack>
           <Typography color="text.secondary" variant="body2" sx={{ mt: 0.75 }}>
-            Les champs marqués d’un astérisque sont obligatoires. Le numéro sera généré à la soumission.
+            {editing ? `Référence ${id} · toute modification documentaire créera une nouvelle version.` : 'Les champs marqués d’un astérisque sont obligatoires. Le numéro sera généré à la soumission.'}
           </Typography>
         </Box>
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ '& .MuiButton-root': { width: { xs: '100%', sm: 'auto' } } }}>
-          <Button component={RouterLink} to="/courriers/externes" variant="outlined">Annuler</Button>
+          <Button component={RouterLink} to={returnPath} variant="outlined">Annuler</Button>
           <Button variant="outlined" startIcon={<SaveOutlined />} onClick={() => setSaved(true)}>Enregistrer le brouillon</Button>
-          <Button type="submit" variant="contained" startIcon={<SendOutlined />}>Soumettre</Button>
+          <Button type="submit" variant="contained" startIcon={<SendOutlined />}>{editing ? 'Enregistrer les modifications' : 'Soumettre'}</Button>
         </Stack>
       </Stack>
 
@@ -175,8 +179,8 @@ export function CorrespondenceFormPage() {
         <Alert severity="success" variant="filled" onClose={() => setSaved(false)}>Brouillon enregistré à 15:42</Alert>
       </Snackbar>
       <Snackbar open={submitted} onClose={() => setSubmitted(false)} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
-        <Alert severity="success" variant="filled" action={<Button color="inherit" onClick={() => navigate('/courriers/externes/ext-0042-2026')}>Ouvrir la fiche</Button>}>
-          <Box><span>Courrier soumis au Chef de service</span><Typography variant="caption" display="block" color="inherit">Référence attribuée : {simulatedReference}</Typography></Box>
+        <Alert severity="success" variant="filled" action={<Button color="inherit" onClick={() => navigate(editing ? returnPath : '/courriers/externes/ext-0042-2026')}>Ouvrir la fiche</Button>}>
+          <Box><span>{editing ? 'Modifications enregistrées' : 'Courrier soumis au Chef de service'}</span><Typography variant="caption" display="block" color="inherit">{editing ? 'Une nouvelle trace a été ajoutée à l’historique.' : `Référence attribuée : ${simulatedReference}`}</Typography></Box>
         </Alert>
       </Snackbar>
     </Box>

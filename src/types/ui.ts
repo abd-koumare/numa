@@ -31,6 +31,7 @@ export type BusinessStatus =
   | 'Validé'
   | 'Brouillon'
   | 'Rejeté'
+  | 'Annulé'
   | 'Signé'
 
 export type Priority = 'Basse' | 'Normale' | 'Haute' | 'Urgente'
@@ -126,6 +127,13 @@ export type SiteBrandingSettings = {
   logoDataUrl: string | null
   logoFileName: string | null
   logoMimeType: 'image/png' | 'image/svg+xml' | null
+  faviconDataUrl: string | null
+  primaryColor: string
+  accentColor: string
+  bannerUrl: string
+  fontFamily: 'NUMA' | 'Organisation'
+  footerText: string
+  defaultHome: 'dashboard' | 'tasks' | 'correspondence'
 }
 
 export type CounterScope =
@@ -171,4 +179,75 @@ export type WorkflowTask = {
   kind: 'Validation' | 'Signature' | 'Traitement'
   priority: Priority
   status: 'À faire' | 'En retard' | 'Terminée'
+}
+
+export type DirectoryUserStatus = 'Actif' | 'Inactif' | 'Invitation en attente'
+
+export type DirectoryUser = {
+  id: string
+  name: string
+  initials: string
+  email: string
+  department: string
+  title: string
+  status: DirectoryUserStatus
+  roles: UserRole[]
+  groups: string[]
+  lastLogin: string
+}
+
+export type DirectoryGroup = {
+  id: string
+  name: string
+  description: string
+  source: 'Active Directory' | 'NUMA'
+  memberIds: string[]
+  roleIds: UserRole[]
+}
+
+export type RoleDefinition = {
+  id: UserRole
+  label: string
+  description: string
+  permissions: string[]
+  protected?: boolean
+}
+
+export type NavigationEntry = {
+  id: string
+  label: string
+  path: string
+  visibility: 'Tous les utilisateurs' | 'Utilisateurs autorisés' | 'Administrateurs'
+  enabled: boolean
+}
+
+export type NotificationItem = {
+  id: string
+  title: string
+  detail: string
+  createdAt: string
+  kind: 'validation' | 'signature' | 'system' | 'deadline'
+  read: boolean
+  path: string
+}
+
+export type ListDefinition = {
+  id: string
+  name: string
+  description: string
+  icon: string
+  periodicity: 'Aucune' | 'Annuelle' | 'Mensuelle' | 'Trimestrielle' | 'Personnalisée'
+  status: 'Publié' | 'Brouillon' | 'Archivé'
+  version: number
+  itemCount: number
+}
+
+export type RuleDefinition = {
+  id: string
+  name: string
+  scope: string
+  condition: string
+  action: string
+  status: 'Publié' | 'Brouillon' | 'Erreur'
+  version: number
 }

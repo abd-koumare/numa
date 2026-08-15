@@ -45,6 +45,8 @@ import type { NavGroup, NavItem } from '../types/ui'
 import { useSiteSettings } from '../app/SiteSettingsContext'
 import { BrandLogo } from './BrandLogo'
 import { AppFooter } from './AppFooter'
+import { useAuth } from '../app/AuthContext'
+import { usePrototypeData } from '../app/PrototypeDataContext'
 
 const iconMap: Record<NonNullable<NavItem['icon']>, ReactNode> = {
   home: <HomeOutlined />,
@@ -76,6 +78,15 @@ export function AppShell({ children }: AppShellProps) {
   const theme = useTheme()
   const desktop = useMediaQuery(theme.breakpoints.up('md'))
   const { branding } = useSiteSettings()
+  const { logout } = useAuth()
+  const { notifications, markNotificationRead } = usePrototypeData()
+  const unreadNotifications = notifications.filter((item) => !item.read).length
+
+  const signOut = () => {
+    setProfileAnchor(null)
+    logout()
+    navigate('/connexion', { replace: true })
+  }
 
   const closeGroupMenu = () => {
     setMenuAnchor(null)
@@ -205,6 +216,8 @@ export function AppShell({ children }: AppShellProps) {
                     color="inherit"
                     sx={{
                       minWidth: 0,
+                      height: 'auto',
+                      alignSelf: 'stretch',
                       px: 1.5,
                       mx: 0.25,
                       borderRadius: 0,
@@ -229,6 +242,8 @@ export function AppShell({ children }: AppShellProps) {
                   onClick={(event) => openNavigationMenu(event, group)}
                   sx={{
                     minWidth: 0,
+                    height: 'auto',
+                    alignSelf: 'stretch',
                     px: 1.5,
                     mx: 0.25,
                     borderRadius: 0,
@@ -255,7 +270,7 @@ export function AppShell({ children }: AppShellProps) {
           </Tooltip>
           <Tooltip title="Notifications">
             <IconButton aria-label="Notifications" aria-haspopup="menu" aria-expanded={Boolean(notificationAnchor)} onClick={(event) => setNotificationAnchor(event.currentTarget)} sx={{ border: { md: '1px solid' }, borderColor: { md: 'divider' }, borderRadius: 1 }}>
-              <Badge variant="dot" color="error">
+              <Badge badgeContent={unreadNotifications} color="error">
                 <NotificationsNone />
               </Badge>
             </IconButton>
@@ -358,12 +373,11 @@ export function AppShell({ children }: AppShellProps) {
         anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
         slotProps={{ paper: { sx: { width: 340, maxWidth: 'calc(100vw - 24px)' } } }}
       >
-        <Box sx={{ px: 2, py: 1.25 }}><Typography fontWeight={700}>Notifications</Typography><Typography variant="caption" color="text.secondary">3 non lues</Typography></Box>
+        <Box sx={{ px: 2, py: 1.25 }}><Typography fontWeight={700}>Notifications</Typography><Typography variant="caption" color="text.secondary">{unreadNotifications} non lue{unreadNotifications > 1 ? 's' : ''}</Typography></Box>
         <Divider />
-        <MenuItem component={RouterLink} to="/taches" onClick={() => setNotificationAnchor(null)} sx={{ whiteSpace: 'normal', py: 1.5 }}><Box><Typography variant="body2" fontWeight={700}>Signature requise</Typography><Typography variant="caption" color="text.secondary">EXT-0040/2026 · échéance aujourd’hui</Typography></Box></MenuItem>
-        <MenuItem component={RouterLink} to="/courriers/externes/ext-0052-2026" onClick={() => setNotificationAnchor(null)} sx={{ whiteSpace: 'normal', py: 1.5 }}><Box><Typography variant="body2" fontWeight={700}>Validation demandée</Typography><Typography variant="caption" color="text.secondary">Demande de subvention 2026</Typography></Box></MenuItem>
+        {notifications.slice(0, 3).map((item) => <MenuItem key={item.id} component={RouterLink} to={item.path} onClick={() => { markNotificationRead(item.id); setNotificationAnchor(null) }} sx={{ whiteSpace: 'normal', py: 1.5, bgcolor: item.read ? 'transparent' : 'action.hover' }}><Box><Typography variant="body2" fontWeight={700}>{item.title}</Typography><Typography variant="caption" color="text.secondary">{item.detail}</Typography></Box></MenuItem>)}
         <Divider />
-        <MenuItem component={RouterLink} to="/activite" onClick={() => setNotificationAnchor(null)}>Voir toute l’activité</MenuItem>
+        <MenuItem component={RouterLink} to="/notifications" onClick={() => setNotificationAnchor(null)}>Voir toutes les notifications</MenuItem>
       </Menu>
 
       <Menu
@@ -376,7 +390,7 @@ export function AppShell({ children }: AppShellProps) {
         <MenuItem component={RouterLink} to="/profil" onClick={() => setProfileAnchor(null)}>Mon profil</MenuItem>
         <MenuItem onClick={() => setProfileAnchor(null)}>Préférences</MenuItem>
         <Divider />
-        <MenuItem onClick={() => setProfileAnchor(null)}>Se déconnecter</MenuItem>
+        <MenuItem onClick={signOut}>Se déconnecter</MenuItem>
       </Menu>
 
       <Drawer

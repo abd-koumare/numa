@@ -1,4 +1,4 @@
-import { type ReactNode, useMemo, useState } from 'react'
+import { type ChangeEvent, type ReactNode, useMemo, useState } from 'react'
 import ArrowBack from '@mui/icons-material/ArrowBack'
 import AttachFileOutlined from '@mui/icons-material/AttachFileOutlined'
 import CheckCircle from '@mui/icons-material/CheckCircle'
@@ -54,6 +54,12 @@ export function CorrespondenceDetailPage() {
   const [tab, setTab] = useState(0)
   const [status, setStatus] = useState<BusinessStatus>('En validation')
   const [rejectionOpen, setRejectionOpen] = useState(false)
+  const [cancellationOpen, setCancellationOpen] = useState(false)
+  const [cancellationReason, setCancellationReason] = useState('')
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const [versionOpen, setVersionOpen] = useState(false)
+  const [versionFile, setVersionFile] = useState('')
+  const [fileError, setFileError] = useState('')
   const [message, setMessage] = useState('')
   const internal = id.startsWith('int-')
   const basePath = internal ? '/courriers/internes' : '/courriers/externes'
@@ -70,6 +76,25 @@ export function CorrespondenceDetailPage() {
     setMessage('Courrier rejeté avec motif et renvoyé à son auteur.')
   }
 
+  const cancelCorrespondence = () => {
+    setStatus('Annulé')
+    setCancellationOpen(false)
+    setMessage('Courrier annulé. Le numéro reste réservé et la justification est auditée.')
+  }
+
+  const chooseVersion = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    if (!['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'].includes(file.type) || file.size > 50 * 1024 * 1024) {
+      setFileError('Fichier refusé : utilisez un PDF ou DOCX de 50 Mo maximum.')
+      setVersionFile('')
+      return
+    }
+    setFileError('')
+    setVersionFile(file.name)
+  }
+
   return (
     <Box sx={{ maxWidth: 1360, mx: 'auto', px: { xs: 2, sm: 3, lg: 4 }, py: { xs: 3, md: 4 } }}>
       <Button component={RouterLink} to={basePath} startIcon={<ArrowBack />} sx={{ px: 0, mb: 1 }}>Retour au registre</Button>
@@ -84,8 +109,9 @@ export function CorrespondenceDetailPage() {
           <Typography color="text.secondary" variant="body2" sx={{ mt: 0.5 }}>{item.sender} · Reçu le {dateFormatter.format(new Date(`${item.receivedAt}T00:00:00`))}</Typography>
         </Box>
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ width: { xs: '100%', md: 'auto' }, '& .MuiButton-root': { width: { xs: '100%', sm: 'auto' } } }}>
-          <Button variant="outlined" startIcon={<EditOutlined />}>Modifier</Button>
+          <Button component={RouterLink} to={`${basePath}/${id}/modifier${internal ? '?type=interne' : ''}`} variant="outlined" startIcon={<EditOutlined />}>Modifier</Button>
           <Button color="error" variant="outlined" startIcon={<Close />} onClick={() => setRejectionOpen(true)}>Rejeter</Button>
+          <Button color="error" onClick={() => setCancellationOpen(true)}>Annuler le courrier</Button>
           <Button variant="outlined" color="success" startIcon={<CheckCircle />} onClick={validate}>Valider</Button>
           <Button component={RouterLink} to={`${basePath}/${id}/signature`} variant="contained" startIcon={<VerifiedOutlined />}>Signer</Button>
         </Stack>
@@ -120,7 +146,7 @@ export function CorrespondenceDetailPage() {
                 <Box sx={{ p: 2.5 }}><Typography component="h2" variant="h3">Étape actuelle</Typography><Typography fontWeight={700} sx={{ mt: 1.5 }}>Direction · étape 4 sur 7</Typography><Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>Assignée à Awa Kouassi · échéance aujourd’hui à 17:00</Typography><Button fullWidth variant="outlined" startIcon={<SendOutlined />} sx={{ mt: 2 }}>Relancer</Button></Box>
               </Card>
               <Card>
-                <Box sx={{ p: 2.5 }}><Typography component="h2" variant="h3">Document actif</Typography><Stack direction="row" spacing={1.5} alignItems="center" sx={{ mt: 1.5 }}><Avatar variant="rounded" sx={{ bgcolor: 'error.light', color: 'error.dark' }}>PDF</Avatar><Box sx={{ minWidth: 0 }}><Typography variant="body2" fontWeight={700} noWrap>{documentVersions[0].fileName}</Typography><Typography variant="caption" color="text.secondary">v{documentVersions[0].version} · {documentVersions[0].size}</Typography></Box></Stack><Button fullWidth startIcon={<OpenInNew />} sx={{ mt: 1.5 }}>Prévisualiser</Button></Box>
+                <Box sx={{ p: 2.5 }}><Typography component="h2" variant="h3">Document actif</Typography><Stack direction="row" spacing={1.5} alignItems="center" sx={{ mt: 1.5 }}><Avatar variant="rounded" sx={{ bgcolor: 'error.light', color: 'error.dark' }}>PDF</Avatar><Box sx={{ minWidth: 0 }}><Typography variant="body2" fontWeight={700} noWrap>{documentVersions[0].fileName}</Typography><Typography variant="caption" color="text.secondary">v{documentVersions[0].version} · {documentVersions[0].size}</Typography></Box></Stack><Button fullWidth startIcon={<OpenInNew />} sx={{ mt: 1.5 }} onClick={() => setPreviewOpen(true)}>Prévisualiser</Button></Box>
               </Card>
             </Stack>
           </Box>
@@ -130,13 +156,13 @@ export function CorrespondenceDetailPage() {
           <Stack spacing={2.5}>
             <Alert severity="info">Une signature couvre uniquement la version précise dont l’empreinte est affichée. Modifier le document crée une nouvelle version non signée.</Alert>
             <Card>
-              <Box sx={{ p: 2.5 }}><Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'flex-start' }} spacing={2}><Box><Typography component="h2" variant="h2">Versions du document</Typography><Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>Traçabilité, empreinte et signatures associées.</Typography></Box><Button variant="contained" startIcon={<AttachFileOutlined />}>Nouvelle version</Button></Stack></Box><Divider />
+              <Box sx={{ p: 2.5 }}><Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'flex-start' }} spacing={2}><Box><Typography component="h2" variant="h2">Versions du document</Typography><Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>Traçabilité, empreinte et signatures associées.</Typography></Box><Button variant="contained" startIcon={<AttachFileOutlined />} onClick={() => setVersionOpen(true)}>Nouvelle version</Button></Stack></Box><Divider />
               <Stack divider={<Divider flexItem />}>
                 {documentVersions.map((document) => (
                   <Box key={document.id} sx={{ p: 2.5, display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'auto minmax(0, 1fr) auto' }, gap: 2, alignItems: 'center' }}>
                     <Avatar variant="rounded" sx={{ bgcolor: document.status === 'Signée' ? 'success.light' : 'grey.100', color: document.status === 'Signée' ? 'success.dark' : 'text.secondary' }}>v{document.version}</Avatar>
                     <Box><Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap"><Typography fontWeight={700}>{document.fileName}</Typography><Chip label={document.status} size="small" color={document.status === 'Signée' ? 'success' : 'default'} /></Stack><Typography variant="caption" color="text.secondary">{document.size} · {document.author} · {document.createdAt}</Typography><Typography variant="caption" display="block" sx={{ mt: 0.5, fontFamily: 'IBM Plex Mono, monospace' }}>sha256:{document.sha256}</Typography></Box>
-                    <Stack direction="row"><Tooltip title="Télécharger"><IconButton aria-label={`Télécharger la version ${document.version}`}><DownloadOutlined /></IconButton></Tooltip><Tooltip title="Ouvrir"><IconButton aria-label={`Ouvrir la version ${document.version}`}><OpenInNew /></IconButton></Tooltip></Stack>
+                    <Stack direction="row"><Tooltip title="Télécharger"><IconButton aria-label={`Télécharger la version ${document.version}`}><DownloadOutlined /></IconButton></Tooltip><Tooltip title="Ouvrir"><IconButton aria-label={`Ouvrir la version ${document.version}`} onClick={() => setPreviewOpen(true)}><OpenInNew /></IconButton></Tooltip></Stack>
                   </Box>
                 ))}
               </Stack>
@@ -165,6 +191,9 @@ export function CorrespondenceDetailPage() {
       <Dialog open={rejectionOpen} onClose={() => setRejectionOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>Rejeter le courrier</DialogTitle><DialogContent><Alert severity="warning" sx={{ mb: 2 }}>Le courrier sera renvoyé à son auteur et l’action sera journalisée.</Alert><TextField autoFocus required fullWidth multiline minRows={4} label="Motif du rejet" placeholder="Expliquez les corrections attendues…" /></DialogContent><DialogActions><Button onClick={() => setRejectionOpen(false)}>Annuler</Button><Button color="error" variant="contained" onClick={reject}>Confirmer le rejet</Button></DialogActions>
       </Dialog>
+      <Dialog open={cancellationOpen} onClose={() => setCancellationOpen(false)} fullWidth maxWidth="sm"><DialogTitle>Annuler définitivement le courrier</DialogTitle><DialogContent><Alert severity="error" sx={{ mb: 2 }}>Le courrier ne poursuivra plus son workflow. Son numéro ne sera jamais réutilisé.</Alert><TextField autoFocus required fullWidth multiline minRows={4} label="Justification de l’annulation" value={cancellationReason} onChange={(event) => setCancellationReason(event.target.value)} /></DialogContent><DialogActions><Button onClick={() => setCancellationOpen(false)}>Retour</Button><Button color="error" variant="contained" disabled={!cancellationReason.trim()} onClick={cancelCorrespondence}>Confirmer l’annulation</Button></DialogActions></Dialog>
+      <Dialog open={previewOpen} onClose={() => setPreviewOpen(false)} fullWidth maxWidth="md"><DialogTitle>Aperçu · {documentVersions[0].fileName}</DialogTitle><DialogContent><Box sx={{ minHeight: 520, bgcolor: '#E9EDF4', p: 3 }}><Box sx={{ bgcolor: 'white', minHeight: 450, maxWidth: 620, mx: 'auto', p: 4, boxShadow: '0 8px 24px rgba(15,23,42,.12)' }}><Typography variant="caption" color="primary" fontWeight={700}>ORGATECH · DOCUMENT NUMA</Typography><Typography variant="h2" sx={{ mt: 2 }}>{item.subject}</Typography><Divider sx={{ my: 3 }} /><Typography variant="body2" sx={{ lineHeight: 1.8 }}>Aperçu sécurisé de la version active. Le document complet sera rendu par le service documentaire dans l’application finale.</Typography><Typography variant="caption" display="block" sx={{ mt: 4, fontFamily: 'IBM Plex Mono, monospace' }}>sha256:{documentVersions[0].sha256}</Typography></Box></Box></DialogContent><DialogActions><Button startIcon={<DownloadOutlined />}>Télécharger</Button><Button variant="contained" onClick={() => setPreviewOpen(false)}>Fermer</Button></DialogActions></Dialog>
+      <Dialog open={versionOpen} onClose={() => setVersionOpen(false)} fullWidth maxWidth="sm"><DialogTitle>Ajouter une nouvelle version</DialogTitle><DialogContent><Alert severity="info" sx={{ mb: 2 }}>Les signatures de la version précédente restent valides mais ne couvrent pas le nouveau fichier.</Alert><Button component="label" variant="outlined" startIcon={<AttachFileOutlined />}>Choisir un PDF ou DOCX<input hidden type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={chooseVersion} /></Button>{versionFile ? <Alert severity="success" sx={{ mt: 2 }}>{versionFile} · analyse antivirus réussie</Alert> : null}{fileError ? <Alert severity="error" sx={{ mt: 2 }}>{fileError}</Alert> : null}<TextField fullWidth multiline minRows={3} label="Commentaire de version" sx={{ mt: 2 }} /></DialogContent><DialogActions><Button onClick={() => setVersionOpen(false)}>Annuler</Button><Button variant="contained" disabled={!versionFile} onClick={() => { setVersionOpen(false); setMessage('Nouvelle version ajoutée avec empreinte SHA-256.') }}>Ajouter la version</Button></DialogActions></Dialog>
       <Snackbar open={Boolean(message)} autoHideDuration={4500} onClose={() => setMessage('')} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}><Alert severity="success" variant="filled" onClose={() => setMessage('')}>{message}</Alert></Snackbar>
     </Box>
   )

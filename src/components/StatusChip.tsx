@@ -7,6 +7,7 @@ const statusStyles: Record<BusinessStatus, { color: string; background: string }
   Validé: { color: '#15803D', background: '#F0FDF4' },
   Brouillon: { color: '#475569', background: '#F1F5F9' },
   Rejeté: { color: '#B91C1C', background: '#FEF2F2' },
+  Annulé: { color: '#7F1D1D', background: '#FFF1F2' },
   Signé: { color: '#087E8B', background: '#ECFEFF' },
 }
 

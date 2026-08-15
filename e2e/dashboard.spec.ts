@@ -1,5 +1,33 @@
 import { expect, test } from '@playwright/test'
 
+test('anonymous user completes MFA, keeps the requested destination, and can sign out', async ({ page }) => {
+  await page.goto('/')
+  await page.evaluate(() => window.localStorage.removeItem('numa.auth.session.v1'))
+  await page.goto('/courriers/externes?view=drafts')
+
+  await expect(page).toHaveURL(/\/connexion\?returnTo=/)
+  await expect(page.getByRole('heading', { name: 'Connexion à NUMA' })).toBeVisible()
+  await page.getByRole('button', { name: 'Se connecter avec ORGATECH' }).click()
+
+  await expect(page.getByRole('heading', { name: 'Vérification renforcée' })).toBeVisible()
+  const code = page.getByLabel('Code de vérification')
+  await code.fill('000000')
+  await page.getByRole('button', { name: 'Vérifier' }).click()
+  await expect(page.getByRole('alert')).toContainText('Code incorrect')
+
+  await code.fill('123456')
+  await page.getByRole('button', { name: 'Vérifier' }).click()
+  await expect(page).toHaveURL(/\/courriers\/externes\?view=drafts$/)
+  await expect(page.getByRole('heading', { name: 'Courriers externes 2026' })).toBeVisible()
+
+  await page.reload()
+  await expect(page.getByRole('heading', { name: 'Courriers externes 2026' })).toBeVisible()
+  await page.getByRole('button', { name: 'Ouvrir le menu du profil' }).click()
+  await page.getByRole('menuitem', { name: 'Se déconnecter' }).click()
+  await expect(page).toHaveURL(/\/connexion(?:\?|$)/)
+  await expect(page.getByRole('heading', { name: 'Connexion à NUMA' })).toBeVisible()
+})
+
 test('dashboard is usable and captures the approved direction', async ({ page }, testInfo) => {
   await page.goto('/')
 
@@ -29,10 +57,10 @@ test('page header actions keep their standard height', async ({ page }) => {
   const actionScreens = [
     ['/courriers/externes/import', 'Étape suivante'],
     ['/courriers/externes/ext-0040-2026/signature', 'Apposer la signature'],
-    ['/administration/listes', 'Publier'],
-    ['/administration/pages', 'Publier'],
+    ['/administration/listes/courriers-externes', 'Publier'],
+    ['/administration/pages/accueil-dt', 'Publier'],
     ['/administration/templates', 'Nouveau template'],
-    ['/administration/workflows', 'Publier'],
+    ['/administration/workflows/courrier-externe', 'Publier'],
     ['/administration/sauvegardes', 'Lancer une sauvegarde'],
   ] as const
 
@@ -61,12 +89,13 @@ test('organization branding can be published and survives reload', async ({ page
 
   await page.reload()
   await expect(page.locator('header').getByTestId('brand-logo')).toHaveAttribute('src', /^data:image\/svg\+xml/)
+  await page.evaluate(() => window.localStorage.removeItem('numa.auth.session.v1'))
   await page.goto('/connexion')
   await expect(page.getByAltText('Logo ORGATECH')).toBeVisible()
 })
 
 test('numbering is configured and previewed by responsible service', async ({ page }) => {
-  await page.goto('/administration/listes')
+  await page.goto('/administration/listes/courriers-externes')
   await page.getByRole('button', { name: 'Numérotation' }).click()
   await expect(page.getByTestId('numbering-preview')).toHaveText('DSI/0053/2026')
 
@@ -156,6 +185,44 @@ test('internal registry matches the external registry experience', async ({ page
   await expect(page).toHaveURL(/courriers\/internes\/int-0187-2026/)
 })
 
+test('navigation, grouped correspondence rows and notifications keep their natural layout', async ({ page }) => {
+  await page.goto('/courriers/internes?view=grouped')
+
+  if (page.viewportSize()!.width >= 900) {
+    const toolbar = page.locator('header .MuiToolbar-root').first()
+    const navigationButton = page.getByRole('button', { name: 'Courriers', exact: true })
+    const [toolbarBox, navigationBox] = await Promise.all([toolbar.boundingBox(), navigationButton.boundingBox()])
+    expect(toolbarBox).not.toBeNull()
+    expect(navigationBox).not.toBeNull()
+    expect(navigationBox!.height).toBeGreaterThan(40)
+    expect(Math.abs((navigationBox!.y + navigationBox!.height) - (toolbarBox!.y + toolbarBox!.height))).toBeLessThanOrEqual(1)
+  }
+
+  const groupedRows = page.getByTestId('grouped-correspondence-row')
+  await expect(groupedRows.first()).toBeVisible()
+  expect(await groupedRows.count()).toBeGreaterThan(1)
+  const firstGroupedBox = await groupedRows.nth(0).boundingBox()
+  const secondGroupedBox = await groupedRows.nth(1).boundingBox()
+  expect(firstGroupedBox).not.toBeNull()
+  expect(secondGroupedBox).not.toBeNull()
+  expect(firstGroupedBox!.height).toBeGreaterThanOrEqual(78)
+  expect(secondGroupedBox!.y).toBeGreaterThanOrEqual(firstGroupedBox!.y + firstGroupedBox!.height)
+
+  await page.evaluate(() => window.localStorage.removeItem('numa.prototype-data.v1'))
+  await page.goto('/notifications')
+  const notificationRows = page.getByTestId('notification-row')
+  await expect(notificationRows.first()).toBeVisible()
+  expect(await notificationRows.count()).toBe(4)
+  const firstNotificationBox = await notificationRows.nth(0).boundingBox()
+  const secondNotificationBox = await notificationRows.nth(1).boundingBox()
+  expect(firstNotificationBox).not.toBeNull()
+  expect(secondNotificationBox).not.toBeNull()
+  expect(firstNotificationBox!.height).toBeGreaterThanOrEqual(86)
+  expect(secondNotificationBox!.y).toBeGreaterThanOrEqual(firstNotificationBox!.y + firstNotificationBox!.height)
+  await expect(page.getByTestId('notification-icon-unread').first()).toHaveCSS('color', 'rgb(255, 255, 255)')
+  await expect(page.getByTestId('notification-icon-read')).not.toHaveCSS('color', 'rgb(255, 255, 255)')
+})
+
 test('creation journey reaches a verified signature proof', async ({ page }, testInfo) => {
   await page.goto('/courriers/nouveau?type=externe')
 
@@ -185,7 +252,7 @@ test('creation journey reaches a verified signature proof', async ({ page }, tes
 })
 
 test('all approved prototype modules expose their primary screen', async ({ page }) => {
-  const screens = [
+  const protectedScreens = [
     ['/courriers', 'Courriers'],
     ['/courriers/internes', 'Courriers internes 2026'],
     ['/courriers/internes/import', 'Importer des courriers internes'],
@@ -195,21 +262,31 @@ test('all approved prototype modules expose their primary screen', async ({ page
     ['/courriers/externes/import', 'Importer des courriers externes'],
     ['/administration', 'Administration'],
     ['/administration/site', 'Identité visuelle'],
-    ['/administration/listes', 'Configuration — Courriers externes'],
-    ['/administration/pages', 'Page Builder — Accueil DT'],
+    ['/administration/listes', 'Listes métier'],
+    ['/administration/pages', 'Pages'],
     ['/administration/templates', 'Templates'],
-    ['/administration/workflows', 'Workflow Builder'],
+    ['/administration/workflows', 'Workflows'],
     ['/administration/audit', 'Journal d’audit'],
     ['/administration/sauvegardes', 'Sauvegardes et restauration'],
     ['/administration/exploitation', 'État de la plateforme'],
     ['/administration/etats-systeme', 'États système transversaux'],
+  ] as const
+
+  for (const [path, heading] of protectedScreens) {
+    await page.goto(path)
+    await expect(page.getByRole('heading', { name: heading, level: 1 })).toBeVisible()
+    await expect(page.getByTestId('app-footer')).toBeVisible()
+  }
+
+  await page.evaluate(() => window.localStorage.removeItem('numa.auth.session.v1'))
+  const publicScreens = [
     ['/connexion', 'Connexion à NUMA'],
     ['/mfa', 'Vérification renforcée'],
     ['/acces-refuse', 'Accès non autorisé'],
     ['/session-expiree', 'Session expirée'],
   ] as const
 
-  for (const [path, heading] of screens) {
+  for (const [path, heading] of publicScreens) {
     await page.goto(path)
     await expect(page.getByRole('heading', { name: heading, level: 1 })).toBeVisible()
     await expect(page.getByTestId('app-footer')).toBeVisible()

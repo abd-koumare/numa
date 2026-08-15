@@ -1,0 +1,145 @@
+import { useMemo, useState } from 'react'
+import Add from '@mui/icons-material/Add'
+import ArrowDownward from '@mui/icons-material/ArrowDownward'
+import ArrowUpward from '@mui/icons-material/ArrowUpward'
+import CheckCircleOutline from '@mui/icons-material/CheckCircleOutline'
+import EditOutlined from '@mui/icons-material/EditOutlined'
+import PlayArrow from '@mui/icons-material/PlayArrow'
+import PublishOutlined from '@mui/icons-material/PublishOutlined'
+import RestartAlt from '@mui/icons-material/RestartAlt'
+import SaveOutlined from '@mui/icons-material/SaveOutlined'
+import {
+  Alert,
+  Box,
+  Button,
+  Card,
+  Checkbox,
+  Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Divider,
+  FormControlLabel,
+  IconButton,
+  MenuItem,
+  Snackbar,
+  Stack,
+  Step,
+  StepLabel,
+  Stepper,
+  Switch,
+  Tab,
+  Tabs,
+  TextField,
+  Tooltip,
+  Typography,
+} from '@mui/material'
+import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom'
+import { usePrototypeData } from '../app/PrototypeDataContext'
+import type { ListDefinition, NavigationEntry, RuleDefinition } from '../types/ui'
+
+function Heading({ title, description, action }: { title: string; description: string; action?: React.ReactNode }) {
+  return <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'flex-start' }} spacing={2} sx={{ mb: 2.5 }}><Box><Typography component="h1" variant="h1">{title}</Typography><Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>{description}</Typography></Box>{action}</Stack>
+}
+
+export function NavigationSettingsPage() {
+  const { navigationEntries, updateNavigation } = usePrototypeData()
+  const [draft, setDraft] = useState(navigationEntries)
+  const [saved, setSaved] = useState(false)
+  const move = (index: number, offset: number) => {
+    const target = index + offset
+    if (target < 0 || target >= draft.length) return
+    const next = [...draft]
+    ;[next[index], next[target]] = [next[target], next[index]]
+    setDraft(next)
+  }
+  const update = (id: string, patch: Partial<NavigationEntry>) => setDraft((current) => current.map((entry) => entry.id === id ? { ...entry, ...patch } : entry))
+  const save = () => { updateNavigation(draft); setSaved(true) }
+  return <Box sx={{ maxWidth: 1100, mx: 'auto', px: { xs: 2, sm: 3 }, py: 3 }}><Heading title="Navigation" description="Ordre, libellés et visibilité de la navigation principale." action={<Button variant="contained" startIcon={<SaveOutlined />} onClick={save}>Enregistrer</Button>} /><Alert severity="info" sx={{ mb: 2 }}>Les éléments non autorisés sont automatiquement masqués pour l’utilisateur.</Alert><Card><Stack divider={<Divider flexItem />}>{draft.map((entry, index) => <Box key={entry.id} sx={{ p: 2, display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'auto 1.2fr 1.5fr 1.2fr auto' }, gap: 1.5, alignItems: 'center' }}><Stack direction="row"><Tooltip title="Monter"><span><IconButton disabled={index === 0} onClick={() => move(index, -1)}><ArrowUpward /></IconButton></span></Tooltip><Tooltip title="Descendre"><span><IconButton disabled={index === draft.length - 1} onClick={() => move(index, 1)}><ArrowDownward /></IconButton></span></Tooltip></Stack><TextField size="small" label="Libellé" value={entry.label} onChange={(event) => update(entry.id, { label: event.target.value })} /><TextField size="small" label="Destination" value={entry.path} onChange={(event) => update(entry.id, { path: event.target.value })} /><TextField select size="small" label="Visibilité" value={entry.visibility} onChange={(event) => update(entry.id, { visibility: event.target.value as NavigationEntry['visibility'] })}><MenuItem value="Tous les utilisateurs">Tous les utilisateurs</MenuItem><MenuItem value="Utilisateurs autorisés">Utilisateurs autorisés</MenuItem><MenuItem value="Administrateurs">Administrateurs</MenuItem></TextField><Switch checked={entry.enabled} onChange={(event) => update(entry.id, { enabled: event.target.checked })} inputProps={{ 'aria-label': `Activer ${entry.label}` }} /></Box>)}</Stack></Card><Snackbar open={saved} autoHideDuration={3000} onClose={() => setSaved(false)}><Alert severity="success" variant="filled">Navigation publiée</Alert></Snackbar></Box>
+}
+
+export function SystemSettingsPage() {
+  const [tab, setTab] = useState(0)
+  const [saved, setSaved] = useState(false)
+  return <Box sx={{ maxWidth: 1100, mx: 'auto', px: { xs: 2, sm: 3 }, py: 3 }}><Heading title="Paramètres système" description="Préférences générales, sécurité, fichiers et communications." action={<Button variant="contained" startIcon={<SaveOutlined />} onClick={() => setSaved(true)}>Enregistrer</Button>} /><Card><Tabs value={tab} onChange={(_, value: number) => setTab(value)} variant="scrollable" scrollButtons="auto" sx={{ px: 1 }}><Tab label="Général" /><Tab label="Sécurité" /><Tab label="Fichiers" /><Tab label="Notifications" /><Tab label="Internationalisation" /></Tabs><Divider /><Stack spacing={2} sx={{ p: 2.5 }}>
+    {tab === 0 ? <><TextField label="Nom technique du site" defaultValue="numa-orgatech" /><TextField label="Page d’accueil par défaut" select defaultValue="dashboard"><MenuItem value="dashboard">Tableau de bord</MenuItem><MenuItem value="tasks">Mes tâches</MenuItem></TextField><FormControlLabel control={<Switch defaultChecked />} label="Autoriser les administrateurs métier à publier" /></> : null}
+    {tab === 1 ? <><TextField label="Durée maximale d’une session" select defaultValue="8"><MenuItem value="4">4 heures</MenuItem><MenuItem value="8">8 heures</MenuItem><MenuItem value="12">12 heures</MenuItem></TextField><FormControlLabel control={<Switch defaultChecked />} label="Exiger le MFA pour les opérations sensibles" /><FormControlLabel control={<Switch defaultChecked />} label="Journaliser les refus d’autorisation" /></> : null}
+    {tab === 2 ? <><TextField label="Taille maximale d’un fichier" defaultValue="50 Mo" /><TextField label="Extensions autorisées" defaultValue="pdf, docx, xlsx, png, jpg" /><FormControlLabel control={<Switch defaultChecked />} label="Analyse antivirus obligatoire" /></> : null}
+    {tab === 3 ? <><TextField label="Adresse d’expédition" defaultValue="numa@orgatech.ci" /><FormControlLabel control={<Switch defaultChecked />} label="Notifications dans l’application" /><FormControlLabel control={<Switch defaultChecked />} label="Notifications par courriel" /></> : null}
+    {tab === 4 ? <><TextField label="Langue par défaut" select defaultValue="fr"><MenuItem value="fr">Français</MenuItem><MenuItem value="en">English</MenuItem></TextField><TextField label="Fuseau horaire" defaultValue="UTC" /><TextField label="Format de date" defaultValue="JJ/MM/AAAA" /></> : null}
+  </Stack></Card><Snackbar open={saved} autoHideDuration={3000} onClose={() => setSaved(false)}><Alert severity="success" variant="filled">Paramètres enregistrés</Alert></Snackbar></Box>
+}
+
+export function SignaturePoliciesPage() {
+  const [saved, setSaved] = useState(false)
+  return <Box sx={{ maxWidth: 1100, mx: 'auto', px: { xs: 2, sm: 3 }, py: 3 }}><Heading title="Politiques de signature" description="Niveaux autorisés, habilitations et exigences de preuve." action={<Button variant="contained" onClick={() => setSaved(true)}>Enregistrer</Button>} /><Alert severity="warning" sx={{ mb: 2 }}>Les couleurs ou logos personnalisés ne modifient jamais les éléments de preuve cryptographique.</Alert><Stack spacing={2}>{[
+    ['Validation électronique', 'Identité, action, date, adresse IP et empreinte du document.', true],
+    ['Signature graphique', 'Tracé ou nom stylisé associé à la preuve auditable.', true],
+    ['Signature numérique', 'Certificat, empreinte et horodatage qualifié.', true],
+  ].map(([title, description, enabled]) => <Card key={String(title)} sx={{ p: 2.5 }}><Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={2}><Box><Typography component="h2" variant="h3">{title}</Typography><Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>{description}</Typography></Box><Switch defaultChecked={Boolean(enabled)} inputProps={{ 'aria-label': `Activer ${title}` }} /></Stack><Divider sx={{ my: 2 }} /><Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 1.5 }}><TextField size="small" label="Rôles habilités" defaultValue={title === 'Signature numérique' ? 'Validateur, Super administrateur' : 'Gestionnaire, Validateur'} /><TextField size="small" label="Durée de conservation" defaultValue="10 ans" /></Box></Card>)}</Stack><Snackbar open={saved} autoHideDuration={3000} onClose={() => setSaved(false)}><Alert severity="success" variant="filled">Politiques enregistrées</Alert></Snackbar></Box>
+}
+
+export function ListsCatalogPage() {
+  const { lists } = usePrototypeData()
+  const [query, setQuery] = useState('')
+  const filtered = lists.filter((list) => `${list.name} ${list.description}`.toLocaleLowerCase('fr').includes(query.toLocaleLowerCase('fr')))
+  return <Box sx={{ maxWidth: 1200, mx: 'auto', px: { xs: 2, sm: 3 }, py: 3 }}><Heading title="Listes métier" description="Définitions, cycles, formulaires, règles et publications." action={<Button component={RouterLink} to="/administration/listes/nouvelle" variant="contained" startIcon={<Add />}>Nouvelle liste</Button>} /><TextField fullWidth value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Rechercher une liste…" sx={{ mb: 2 }} slotProps={{ htmlInput: { 'aria-label': 'Rechercher une liste' } }} /><Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: 2 }}>{filtered.map((list) => <Card key={list.id} sx={{ p: 2.5 }}><Stack direction="row" justifyContent="space-between"><Chip label={list.icon} size="small" variant="outlined" /><Chip label={list.status} size="small" color={list.status === 'Publié' ? 'success' : list.status === 'Brouillon' ? 'warning' : 'default'} /></Stack><Typography component="h2" variant="h2" sx={{ mt: 2 }}>{list.name}</Typography><Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>{list.description}</Typography><Typography variant="caption" display="block" sx={{ mt: 1.5 }}>{list.periodicity} · version {list.version} · {list.itemCount.toLocaleString('fr-FR')} éléments</Typography><Button component={RouterLink} to={`/administration/listes/${list.id}`} startIcon={<EditOutlined />} sx={{ mt: 1.5 }}>Configurer</Button></Card>)}</Box></Box>
+}
+
+const listWizardSteps = ['Source', 'Informations', 'Cycle', 'Configuration', 'Confirmation']
+export function ListCreationWizardPage() {
+  const { addList } = usePrototypeData()
+  const navigate = useNavigate()
+  const [step, setStep] = useState(0)
+  const [source, setSource] = useState('empty')
+  const [name, setName] = useState('Registre des incidents')
+  const [description, setDescription] = useState('Suivi des incidents déclarés par les services.')
+  const [periodicity, setPeriodicity] = useState<ListDefinition['periodicity']>('Annuelle')
+  const id = name.toLocaleLowerCase('fr').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'nouvelle-liste'
+  const finish = () => { addList({ id, name, description, icon: 'Registre', periodicity, status: 'Brouillon', version: 1, itemCount: 0 }); navigate(`/administration/listes/${id}`, { replace: true }) }
+  return <Box sx={{ maxWidth: 1000, mx: 'auto', px: { xs: 2, sm: 3 }, py: 3 }}><Heading title="Créer une liste" description="Assistant de création d’une nouvelle définition métier." /><Card sx={{ p: 2, mb: 2 }}><Stepper activeStep={step} alternativeLabel>{listWizardSteps.map((label) => <Step key={label}><StepLabel>{label}</StepLabel></Step>)}</Stepper></Card><Card sx={{ p: { xs: 2.5, md: 4 } }}>
+    {step === 0 ? <Stack spacing={1.5}><Typography component="h2" variant="h2">Point de départ</Typography>{[['empty', 'Liste vide', 'Configurez tous les champs et règles.'], ['template', 'Depuis un template', 'Réutilisez une configuration publiée.'], ['copy', 'Copier une liste', 'Reprenez la configuration sans ses données.']].map(([value, label, detail]) => <Button key={value} variant={source === value ? 'contained' : 'outlined'} onClick={() => setSource(value)} sx={{ justifyContent: 'flex-start', p: 2 }}><Box textAlign="left"><Typography fontWeight={700}>{label}</Typography><Typography variant="caption">{detail}</Typography></Box></Button>)}</Stack> : null}
+    {step === 1 ? <Stack spacing={2}><Typography component="h2" variant="h2">Informations générales</Typography><TextField required label="Nom" value={name} onChange={(event) => setName(event.target.value)} /><TextField multiline minRows={3} label="Description" value={description} onChange={(event) => setDescription(event.target.value)} /><TextField label="Icône" select defaultValue="registry"><MenuItem value="registry">Registre</MenuItem><MenuItem value="form">Formulaire</MenuItem><MenuItem value="folder">Dossier</MenuItem></TextField></Stack> : null}
+    {step === 2 ? <Stack spacing={2}><Typography component="h2" variant="h2">Cycle temporel</Typography><TextField select label="Périodicité" value={periodicity} onChange={(event) => setPeriodicity(event.target.value as ListDefinition['periodicity'])}>{['Aucune', 'Annuelle', 'Mensuelle', 'Trimestrielle', 'Personnalisée'].map((item) => <MenuItem key={item} value={item}>{item}</MenuItem>)}</TextField><Alert severity="info">Une nouvelle instance sera préparée automatiquement avant chaque nouveau cycle.</Alert></Stack> : null}
+    {step === 3 ? <Stack spacing={1}><Typography component="h2" variant="h2">Configuration initiale</Typography><FormControlLabel control={<Checkbox defaultChecked />} label="Ajouter les champs système" /><FormControlLabel control={<Checkbox defaultChecked />} label="Créer une vue tabulaire par défaut" /><FormControlLabel control={<Checkbox defaultChecked />} label="Activer les brouillons" /><FormControlLabel control={<Checkbox />} label="Associer le workflow Courrier standard" /></Stack> : null}
+    {step === 4 ? <Stack spacing={2}><Typography component="h2" variant="h2">Confirmer la création</Typography><Alert severity="success" icon={<CheckCircleOutline />}>La définition sera créée en brouillon, sans données.</Alert><Typography><strong>{name}</strong> · {periodicity} · source {source === 'empty' ? 'vide' : source === 'template' ? 'template' : 'copie'}</Typography></Stack> : null}
+    <Stack direction="row" justifyContent="space-between" sx={{ mt: 4 }}><Button disabled={step === 0} onClick={() => setStep((value) => value - 1)}>Précédent</Button>{step < listWizardSteps.length - 1 ? <Button variant="contained" disabled={step === 1 && !name.trim()} onClick={() => setStep((value) => value + 1)}>Continuer</Button> : <Button variant="contained" onClick={finish}>Créer la liste</Button>}</Stack>
+  </Card></Box>
+}
+
+export function RulesCatalogPage() {
+  const { rules } = usePrototypeData()
+  return <Box sx={{ maxWidth: 1200, mx: 'auto', px: { xs: 2, sm: 3 }, py: 3 }}><Heading title="Règles métier" description="Validations et automatismes conditionnels versionnés." action={<Button component={RouterLink} to="/administration/regles/nouvelle" variant="contained" startIcon={<Add />}>Nouvelle règle</Button>} /><Stack spacing={1.5}>{rules.map((rule) => <Card key={rule.id} sx={{ p: 2.5 }}><Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1.2fr 1fr 1fr auto' }, gap: 2, alignItems: 'center' }}><Box><Typography component="h2" variant="h3">{rule.name}</Typography><Typography variant="caption" color="text.secondary">{rule.scope} · version {rule.version}</Typography></Box><Typography variant="body2"><strong>SI</strong> {rule.condition}</Typography><Typography variant="body2"><strong>ALORS</strong> {rule.action}</Typography><Stack direction="row" alignItems="center"><Chip label={rule.status} size="small" color={rule.status === 'Publié' ? 'success' : rule.status === 'Erreur' ? 'error' : 'warning'} /><Button component={RouterLink} to={`/administration/regles/${rule.id}`}>Modifier</Button></Stack></Box></Card>)}</Stack></Box>
+}
+
+export function RuleBuilderPage() {
+  const { id } = useParams()
+  const { rules, addRule, updateRule } = usePrototypeData()
+  const existing = rules.find((rule) => rule.id === id)
+  const [name, setName] = useState(existing?.name ?? 'Nouvelle règle')
+  const [scope, setScope] = useState(existing?.scope ?? 'Courriers externes')
+  const [condition, setCondition] = useState(existing?.condition ?? 'priorité = Urgente')
+  const [action, setAction] = useState(existing?.action ?? 'Notifier le responsable')
+  const [tested, setTested] = useState(false)
+  const [published, setPublished] = useState(existing?.status === 'Publié')
+  const save = (publish: boolean) => {
+    const rule: RuleDefinition = { id: existing?.id ?? `rule-${Date.now()}`, name, scope, condition, action, status: publish ? 'Publié' : 'Brouillon', version: existing?.version ?? 1 }
+    if (existing) updateRule(existing.id, rule); else addRule(rule)
+    setPublished(publish)
+  }
+  const conflict = !condition.includes('=') && !condition.includes('>') && !condition.includes('<')
+  return <Box sx={{ maxWidth: 1100, mx: 'auto', px: { xs: 2, sm: 3 }, py: 3 }}><Heading title="Rule Builder" description={`${existing ? existing.name : 'Nouvelle règle'} · éditeur SI/ALORS`} action={<Stack direction="row" spacing={1}><Button variant="outlined" startIcon={<PlayArrow />} onClick={() => setTested(true)}>Tester</Button><Button variant="contained" startIcon={<PublishOutlined />} disabled={conflict} onClick={() => save(true)}>Publier</Button></Stack>} />{tested ? <Alert severity={conflict ? 'error' : 'success'} sx={{ mb: 2 }}>{conflict ? 'Condition invalide : ajoutez un opérateur de comparaison.' : 'Test réussi sur 24 éléments : 3 déclenchements, aucun conflit.'}</Alert> : null}{published ? <Alert severity="success" sx={{ mb: 2 }}>Règle publiée et nouvelle version créée.</Alert> : null}<Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}><Card sx={{ p: 2.5 }}><Typography component="h2" variant="h2">Définition</Typography><Stack spacing={2} sx={{ mt: 2 }}><TextField label="Nom" value={name} onChange={(event) => setName(event.target.value)} /><TextField label="Périmètre" value={scope} onChange={(event) => setScope(event.target.value)} /><TextField multiline minRows={3} label="SI · Condition" value={condition} error={conflict} onChange={(event) => setCondition(event.target.value)} /><TextField multiline minRows={3} label="ALORS · Action" value={action} onChange={(event) => setAction(event.target.value)} /></Stack></Card><Stack spacing={2}><Card sx={{ p: 2.5 }}><Typography component="h2" variant="h3">Aperçu lisible</Typography><Alert severity="info" sx={{ mt: 2 }}>Lorsque <strong>{condition}</strong>, NUMA doit <strong>{action.toLocaleLowerCase('fr')}</strong>.</Alert></Card><Card sx={{ p: 2.5 }}><Typography component="h2" variant="h3">Versions</Typography><Stack spacing={1} sx={{ mt: 1.5 }}>{['v4 · Publiée · 12/08/2026', 'v3 · Archivée · 03/08/2026', 'v2 · Archivée · 16/07/2026'].map((version) => <Stack key={version} direction="row" justifyContent="space-between"><Typography variant="body2">{version}</Typography><Button size="small" startIcon={<RestartAlt />}>Restaurer</Button></Stack>)}</Stack></Card></Stack></Box></Box>
+}
+
+export function InstancesManagementPage() {
+  const [dialog, setDialog] = useState<'rollover' | 'reopen' | null>(null)
+  const [reason, setReason] = useState('')
+  const [message, setMessage] = useState('')
+  const confirm = () => { setMessage(dialog === 'rollover' ? 'Préparation des instances 2027 planifiée' : 'Instance Externe 2025 rouverte en lecture/écriture contrôlée'); setDialog(null); setReason('') }
+  return <Box sx={{ maxWidth: 1150, mx: 'auto', px: { xs: 2, sm: 3 }, py: 3 }}><Heading title="Cycles et instances" description="Ouverture, clôture, bascule annuelle et réouverture exceptionnelle." action={<Button variant="contained" onClick={() => setDialog('rollover')}>Préparer 2027</Button>} /><Alert severity="info" sx={{ mb: 2 }}>Les compteurs Interne et Externe restent indépendants pour chaque instance annuelle.</Alert><Stack spacing={1.5}>{[
+    ['2027', 'Future', 'Préparée automatiquement le 15/12/2026', '0 interne · 0 externe'],
+    ['2026', 'Active', 'Ouverte le 01/01/2026', '1 164 internes · 1 482 externes'],
+    ['2025', 'Clôturée', 'Clôturée le 05/01/2026', '1 102 internes · 1 396 externes'],
+  ].map(([year, status, date, count]) => <Card key={year} sx={{ p: 2.5 }}><Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '100px 1fr auto' }, gap: 2, alignItems: 'center' }}><Typography variant="h2">{year}</Typography><Box><Stack direction="row" spacing={1}><Chip label={status} size="small" color={status === 'Active' ? 'success' : status === 'Future' ? 'info' : 'default'} /><Typography variant="body2">{date}</Typography></Stack><Typography variant="caption" color="text.secondary">{count}</Typography></Box>{status === 'Clôturée' ? <Button color="warning" onClick={() => setDialog('reopen')}>Réouvrir</Button> : status === 'Active' ? <Button variant="outlined">Planifier la clôture</Button> : null}</Box></Card>)}</Stack><Dialog open={Boolean(dialog)} onClose={() => setDialog(null)} fullWidth maxWidth="sm"><DialogTitle>{dialog === 'rollover' ? 'Préparer la bascule annuelle' : 'Réouvrir une instance clôturée'}</DialogTitle><DialogContent><Alert severity={dialog === 'rollover' ? 'info' : 'warning'} sx={{ mb: 2 }}>{dialog === 'rollover' ? 'Les structures, permissions et compteurs seront copiés sans reprendre les données.' : 'La réouverture est exceptionnelle, temporaire et entièrement auditée.'}</Alert><TextField fullWidth multiline minRows={3} required label="Justification" value={reason} onChange={(event) => setReason(event.target.value)} /></DialogContent><DialogActions><Button onClick={() => setDialog(null)}>Annuler</Button><Button variant="contained" color={dialog === 'reopen' ? 'warning' : 'primary'} disabled={!reason.trim()} onClick={confirm}>Confirmer</Button></DialogActions></Dialog><Snackbar open={Boolean(message)} autoHideDuration={3500} onClose={() => setMessage('')}><Alert severity="success" variant="filled">{message}</Alert></Snackbar></Box>
+}

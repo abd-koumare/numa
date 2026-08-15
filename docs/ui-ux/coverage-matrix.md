@@ -13,15 +13,15 @@ Statuts autorisés : `À faire`, `En cours`, `Terminé`, `Validé`, `N/A`. Un é
 | Tâches/validations | Terminé | Terminé | Terminé | Terminé | Terminé | Terminé | En cours | À faire |
 | Recherche/import/export | Terminé | Terminé | Terminé | Terminé | Terminé | Terminé | En cours | À faire |
 | Documents/signatures | Terminé | Terminé | Terminé | Terminé | Terminé | Terminé | En cours | À faire |
-| Administration minimale | Terminé | En cours | En cours | En cours | En cours | En cours | En cours | À faire |
-| Builders listes/champs/formulaires | Terminé | En cours | En cours | En cours | En cours | En cours | En cours | À faire |
+| Administration minimale | Terminé | Terminé | Terminé | Terminé | Terminé | Terminé | En cours | À faire |
+| Builders listes/champs/formulaires | Terminé | Terminé | Terminé | Terminé | Terminé | Terminé | En cours | À faire |
 | Builder numérotation | Terminé | Terminé | Terminé | Terminé | Terminé | Terminé | En cours | À faire |
-| Builders règles/workflows | Terminé | En cours | En cours | En cours | En cours | En cours | En cours | À faire |
+| Builders règles/workflows | Terminé | Terminé | Terminé | Terminé | Terminé | Terminé | En cours | À faire |
 | Identité visuelle et thème | Terminé | Terminé | Terminé | Terminé | Terminé | Terminé | En cours | À faire |
-| Pages/navigation/templates | Terminé | En cours | En cours | En cours | En cours | En cours | En cours | À faire |
-| Audit/sauvegarde/exploitation | Terminé | En cours | En cours | En cours | En cours | En cours | En cours | À faire |
+| Pages/navigation/templates | Terminé | Terminé | Terminé | Terminé | Terminé | Terminé | En cours | À faire |
+| Audit/sauvegarde/exploitation | Terminé | Terminé | Terminé | Terminé | Terminé | Terminé | En cours | À faire |
 | États système transversaux | Terminé | Terminé | Terminé | Terminé | Terminé | Terminé | En cours | À faire |
 
 ## Prochain jalon
 
-Faire valider le parcours `création → fiche → validation → signature → preuve`, puis mener la revue détaillée des builders, de l’administration et de l’exploitation jusqu’au statut `Validé`.
+La couverture fonctionnelle du prototype est terminée. Le prochain jalon est la recette UI/UX avec les utilisateurs : revue d’accessibilité, validation métier écran par écran et passage des lignes de `Terminé` à `Validé`.
