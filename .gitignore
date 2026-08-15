@@ -1,0 +1,14 @@
+node_modules/
+.idea/
+dist/
+coverage/
+test-results/
+playwright-report/
+.vite/
+*.local
+*.log
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts
+playwright.config.js
+playwright.config.d.ts
