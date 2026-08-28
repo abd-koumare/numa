@@ -78,9 +78,17 @@ export function AppShell({ children }: AppShellProps) {
   const theme = useTheme()
   const desktop = useMediaQuery(theme.breakpoints.up('md'))
   const { branding } = useSiteSettings()
-  const { logout } = useAuth()
+  const { logout, session } = useAuth()
   const { notifications, markNotificationRead } = usePrototypeData()
   const unreadNotifications = notifications.filter((item) => !item.read).length
+  const displayUser = session?.user ?? currentUser
+  const capabilities = new Set(displayUser.capabilities ?? [])
+  const visibleNavigation = navigation
+    .filter((group) => !group.permissions?.length || group.permissions.some((permission) => capabilities.has(permission)))
+    .map((group) => ({
+      ...group,
+      children: group.children?.filter((item) => !item.permissions?.length || item.permissions.some((permission) => capabilities.has(permission))),
+    }))
 
   const signOut = () => {
     setProfileAnchor(null)
@@ -136,7 +144,7 @@ export function AppShell({ children }: AppShellProps) {
       <Box sx={{ display: 'flex', alignItems: 'center', height: 72, px: 2.5 }}>{brand}</Box>
       <Divider />
       <Box component="nav" aria-label="Navigation mobile" sx={{ py: 1.5 }}>
-        {navigation.map((group) => (
+        {visibleNavigation.map((group) => (
           <Box key={group.path} sx={{ mb: 0.5 }}>
             <List disablePadding>
               <ListItemButton
@@ -205,7 +213,7 @@ export function AppShell({ children }: AppShellProps) {
           {brand}
 
           <Box component="nav" aria-label="Navigation principale" sx={{ display: { xs: 'none', md: 'flex' }, alignSelf: 'stretch', ml: 1 }}>
-            {navigation.map((group) => {
+            {visibleNavigation.map((group) => {
               const active = groupIsActive(group)
               if (!group.children) {
                 return (
@@ -289,11 +297,11 @@ export function AppShell({ children }: AppShellProps) {
             sx={{ minWidth: 0, px: { xs: 0.5, sm: 1 }, gap: 1, color: 'text.primary' }}
           >
             <Avatar sx={{ width: 36, height: 36, bgcolor: 'primary.dark', fontSize: 12, fontFamily: 'Sora, sans-serif', fontWeight: 700 }}>
-              {currentUser.initials}
+              {displayUser.initials}
             </Avatar>
             <Box sx={{ display: { xs: 'none', lg: 'block' }, textAlign: 'left', lineHeight: 1.2 }}>
-              <Typography variant="body2" fontWeight={700}>{currentUser.name}</Typography>
-              <Typography variant="caption" color="text.disabled">{currentUser.roleLabel}</Typography>
+              <Typography variant="body2" fontWeight={700}>{displayUser.name}</Typography>
+              <Typography variant="caption" color="text.disabled">{displayUser.roleLabel}</Typography>
             </Box>
           </Button>
         </Toolbar>

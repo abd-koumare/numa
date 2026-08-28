@@ -1,5 +1,8 @@
 import { internalCorrespondences } from '../data/internalCorrespondences'
 import { CorrespondenceRegistryPage, type CorrespondenceRegistryConfig } from './ExternalRegistryPage'
+import { useCorrespondences } from '../api/correspondences'
+import { API_DATA_ENABLED } from '../api/client'
+import { Alert, Box } from '@mui/material'
 
 export const internalRegistryConfig: CorrespondenceRegistryConfig = {
   title: 'Courriers internes 2026',
@@ -15,5 +18,7 @@ export const internalRegistryConfig: CorrespondenceRegistryConfig = {
 }
 
 export function InternalRegistryPage() {
-  return <CorrespondenceRegistryPage items={internalCorrespondences} config={internalRegistryConfig} />
+  const { items, count, setQuery, error, loading } = useCorrespondences('internal', internalCorrespondences, { pageSize: 10 })
+  if (error) return <Box sx={{ maxWidth: 900, mx: 'auto', p: 3 }}><Alert severity="error">{error}</Alert></Box>
+  return <CorrespondenceRegistryPage items={items} config={internalRegistryConfig} server={API_DATA_ENABLED ? { count, loading, setQuery } : undefined} />
 }

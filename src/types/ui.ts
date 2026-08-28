@@ -33,6 +33,8 @@ export type BusinessStatus =
   | 'Rejeté'
   | 'Annulé'
   | 'Signé'
+  | 'Enregistré'
+  | 'Archivé'
 
 export type Priority = 'Basse' | 'Normale' | 'Haute' | 'Urgente'
 
@@ -42,6 +44,8 @@ export type SessionUser = {
   role: UserRole
   roleLabel: string
   organization: string
+  capabilities?: string[]
+  accessPending?: boolean
 }
 
 export type Metric = {
@@ -194,6 +198,7 @@ export type DirectoryUser = {
   roles: UserRole[]
   groups: string[]
   lastLogin: string
+  identitySubject?: string
 }
 
 export type DirectoryGroup = {

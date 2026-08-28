@@ -1,0 +1,207 @@
+name: numa
+
+x-backend: &backend
+  image: numa-api:${NUMA_VERSION:-1.0.0}
+  env_file: ["${NUMA_ENV_FILE:-.env.production}"]
+  environment: &backend-env
+    POSTGRES_HOST: postgres
+    POSTGRES_PORT: "5432"
+    AWS_S3_ENDPOINT_URL: http://minio:9000
+    CELERY_BROKER_URL: redis://redis:6379/0
+    CELERY_RESULT_BACKEND: redis://redis:6379/1
+    CLAMAV_HOST: clamav
+    OIDC_ISSUER: ${NUMA_PUBLIC_URL}/auth/realms/numa
+    OIDC_PUBLIC_ISSUER: ${NUMA_PUBLIC_URL}/auth/realms/numa
+    OIDC_JWKS_URL: http://keycloak:8080/auth/realms/numa/protocol/openid-connect/certs
+    KEYCLOAK_ADMIN_URL: http://keycloak:8080/auth
+  restart: unless-stopped
+  networks: [numa-internal]
+  volumes:
+    - backups_data:/var/lib/numa/backups
+    - static_data:/app/staticfiles
+  depends_on:
+    postgres: { condition: service_healthy }
+    redis: { condition: service_healthy }
+    minio-init: { condition: service_completed_successfully }
+
+services:
+  postgres:
+    image: postgres:17.6-alpine
+    env_file: ["${NUMA_ENV_FILE:-.env.production}"]
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/10-keycloak-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+    networks: [numa-internal]
+
+  redis:
+    image: redis:8.2-alpine
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    volumes: [redis_data:/data]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+    networks: [numa-internal]
+
+  minio:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    command: server /data --console-address ":9001"
+    env_file: ["${NUMA_ENV_FILE:-.env.production}"]
+    volumes: [minio_data:/data]
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+    networks: [numa-internal]
+
+  minio-init:
+    image: minio/mc:RELEASE.2025-04-16T18-13-26Z
+    env_file: ["${NUMA_ENV_FILE:-.env.production}"]
+    depends_on:
+      minio: { condition: service_healthy }
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        mc alias set local http://minio:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD;
+        mc mb --ignore-existing local/$$MINIO_BUCKET;
+        mc mb --ignore-existing local/$$NUMA_BACKUP_S3_BUCKET;
+        mc version enable local/$$MINIO_BUCKET;
+        mc version enable local/$$NUMA_BACKUP_S3_BUCKET;
+        mc anonymous set none local/$$MINIO_BUCKET;
+        mc anonymous set none local/$$NUMA_BACKUP_S3_BUCKET
+    restart: "no"
+    networks: [numa-internal]
+
+  clamav:
+    image: clamav/clamav:1.4.3
+    volumes: [clamav_data:/var/lib/clamav]
+    healthcheck:
+      test: ["CMD-SHELL", "printf 'PING\\n' | nc 127.0.0.1 3310 | grep PONG"]
+      interval: 20s
+      timeout: 5s
+      retries: 40
+      start_period: 90s
+    restart: unless-stopped
+    networks: [numa-internal]
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.3.2
+    env_file: ["${NUMA_ENV_FILE:-.env.production}"]
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}?currentSchema=keycloak
+      KC_DB_USERNAME: ${POSTGRES_USER}
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD}
+      KC_HTTP_ENABLED: "true"
+      KC_HTTP_RELATIVE_PATH: /auth
+      KC_HOSTNAME: ${NUMA_PUBLIC_URL}/auth
+      KC_PROXY_HEADERS: xforwarded
+      KC_HEALTH_ENABLED: "true"
+    entrypoint: ["/bin/bash", "/opt/keycloak/numa/production-entrypoint.sh"]
+    volumes:
+      - ./docker/keycloak/production-entrypoint.sh:/opt/keycloak/numa/production-entrypoint.sh:ro
+      - ./docker/keycloak/numa-realm.production.json:/opt/keycloak/numa/numa-realm.template.json:ro
+      - ./docker/keycloak/themes/numa:/opt/keycloak/themes/numa:ro
+    depends_on:
+      postgres: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/9000; printf \"HEAD /health/ready HTTP/1.0\\r\\n\\r\\n\" >&3; grep -q \" 200\" <&3'"]
+      interval: 10s
+      timeout: 5s
+      retries: 40
+      start_period: 45s
+    restart: unless-stopped
+    networks: [numa-internal]
+
+  migrate:
+    <<: *backend
+    command: ["sh", "-c", "python manage.py migrate --noinput && python manage.py collectstatic --noinput"]
+    environment:
+      <<: *backend-env
+      NUMA_SEED_DEMO: "false"
+    restart: "no"
+
+  api:
+    <<: *backend
+    command: ["sh", "/app/entrypoint.sh"]
+    environment:
+      <<: *backend-env
+      NUMA_USE_RUNSERVER: "false"
+      NUMA_SEED_DEMO: "false"
+      NUMA_RUN_MIGRATIONS: "false"
+      NUMA_COLLECTSTATIC: "false"
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      minio-init: { condition: service_completed_successfully }
+      keycloak: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; r=urllib.request.Request('http://127.0.0.1:8000/api/v1/health/', headers={'X-Forwarded-Proto':'https'}); urllib.request.urlopen(r, timeout=5)"]
+      interval: 10s
+      timeout: 6s
+      retries: 30
+
+  worker:
+    <<: *backend
+    command: ["celery", "-A", "numa", "worker", "--loglevel=INFO", "--concurrency=${CELERY_WORKER_CONCURRENCY:-4}"]
+    depends_on:
+      api: { condition: service_healthy }
+      clamav: { condition: service_healthy }
+
+  beat:
+    <<: *backend
+    command: ["celery", "-A", "numa", "beat", "--loglevel=INFO", "--schedule=/tmp/celerybeat-schedule"]
+    depends_on:
+      api: { condition: service_healthy }
+
+  frontend:
+    image: numa-web:${NUMA_VERSION:-1.0.0}
+    env_file: ["${NUMA_ENV_FILE:-.env.production}"]
+    environment:
+      NUMA_ENVIRONMENT: production
+    restart: unless-stopped
+    networks: [numa-internal]
+
+  caddy:
+    image: caddy:2.10.2-alpine
+    env_file: ["${NUMA_ENV_FILE:-.env.production}"]
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+      - ${NUMA_CERT_DIR:-./certificates}:/etc/numa/certificates:ro
+    depends_on:
+      api: { condition: service_healthy }
+      frontend: { condition: service_started }
+      keycloak: { condition: service_healthy }
+    restart: unless-stopped
+    networks: [numa-internal]
+
+networks:
+  numa-internal:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+  clamav_data:
+  backups_data:
+  static_data:
+  caddy_data:
+  caddy_config:

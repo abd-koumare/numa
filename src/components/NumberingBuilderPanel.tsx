@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import SaveOutlined from '@mui/icons-material/SaveOutlined'
 import {
   Alert,
@@ -19,6 +19,7 @@ import {
   validateNumberingFormat,
 } from '../app/SiteSettingsContext'
 import type { NumberingSettings } from '../types/ui'
+import { API_DATA_ENABLED, apiFetch } from '../api/client'
 
 const variableTokens = ['{SERVICE}', '{SEQUENCE:0000}', '{ANNEE}', '{DIRECTION}', '{TYPE}', '{LISTE}']
 const serviceOptions = [
@@ -33,9 +34,28 @@ export function NumberingBuilderPanel() {
   const [draft, setDraft] = useState<NumberingSettings>(numbering)
   const [sampleService, setSampleService] = useState('DSI')
   const [saved, setSaved] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
   const formatInput = useRef<HTMLInputElement>(null)
   const errors = useMemo(() => validateNumberingFormat(draft.format), [draft.format])
-  const preview = formatCorrespondenceReference(draft, sampleService)
+  const localPreview = formatCorrespondenceReference(draft, sampleService)
+  const [preview, setPreview] = useState(localPreview)
+  const [previewSequence, setPreviewSequence] = useState(draft.nextSequence)
+
+  useEffect(() => setDraft(numbering), [numbering])
+  useEffect(() => {
+    if (!API_DATA_ENABLED) { setPreview(localPreview); setPreviewSequence(draft.nextSequence); return }
+    if (errors.length) { setPreview('Format invalide'); return }
+    const controller = new AbortController()
+    const timer = window.setTimeout(() => {
+      apiFetch<{ reference: string; sequence: number }>('/numbering/preview/', {
+        method: 'POST', signal: controller.signal,
+        body: JSON.stringify({ registry: 'external', service_code: sampleService, direction_code: 'DT', settings: draft }),
+      }).then((result) => { setPreview(result.reference); setPreviewSequence(result.sequence) })
+        .catch((reason) => { if (!controller.signal.aborted) setSaveError(reason instanceof Error ? reason.message : 'Aperçu indisponible.') })
+    }, 250)
+    return () => { window.clearTimeout(timer); controller.abort() }
+  }, [draft, errors.length, localPreview, sampleService])
 
   const insertVariable = (token: string) => {
     const input = formatInput.current
@@ -49,10 +69,18 @@ export function NumberingBuilderPanel() {
     })
   }
 
-  const save = () => {
+  const save = async () => {
     if (errors.length) return
-    updateNumbering(draft)
-    setSaved(true)
+    setSaving(true)
+    setSaveError('')
+    try {
+      await updateNumbering(draft)
+      setSaved(true)
+    } catch (reason) {
+      setSaveError(reason instanceof Error ? reason.message : 'La numérotation n’a pas pu être enregistrée.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -109,8 +137,9 @@ export function NumberingBuilderPanel() {
           />
 
           {errors.length ? <Alert severity="error"><Stack spacing={0.5}>{errors.map((error) => <Typography key={error} variant="body2">{error}</Typography>)}</Stack></Alert> : null}
+          {saveError ? <Alert severity="error">{saveError}</Alert> : null}
           {saved ? <Alert severity="success">Configuration enregistrée. Elle sera utilisée pour les prochaines attributions.</Alert> : null}
-          <Box><Button variant="contained" startIcon={<SaveOutlined />} disabled={Boolean(errors.length)} onClick={save}>Enregistrer la numérotation</Button></Box>
+          <Box><Button variant="contained" startIcon={<SaveOutlined />} disabled={saving || Boolean(errors.length)} onClick={() => void save()}>{saving ? 'Enregistrement…' : 'Enregistrer la numérotation'}</Button></Box>
         </Stack>
 
         <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1.5, overflow: 'hidden' }}>
@@ -129,7 +158,7 @@ export function NumberingBuilderPanel() {
               <Typography variant="caption" color="text.secondary">Référence simulée</Typography>
               <Typography data-testid="numbering-preview" sx={{ mt: 0.5, fontFamily: 'IBM Plex Mono, monospace', fontWeight: 700, fontSize: { xs: 19, sm: 23 }, overflowWrap: 'anywhere' }}>{preview}</Typography>
             </Box>
-            <Typography variant="caption" color="text.secondary">Séquence actuelle simulée : {draft.nextSequence}. Une attribution réelle sera transactionnelle et ne réutilisera jamais un numéro annulé.</Typography>
+            <Typography variant="caption" color="text.secondary">Prochaine séquence : {previewSequence}. Une attribution réelle sera transactionnelle et ne réutilisera jamais un numéro annulé.</Typography>
           </Stack>
         </Box>
       </Box>

@@ -1,0 +1,72 @@
+{
+  "realm": "numa",
+  "enabled": true,
+  "displayName": "NUMA",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": true,
+  "rememberMe": true,
+  "roles": {
+    "realm": [
+      {"name": "super-admin"},
+      {"name": "admin"},
+      {"name": "configurateur"},
+      {"name": "gestionnaire"},
+      {"name": "validateur"},
+      {"name": "utilisateur"},
+      {"name": "lecteur"},
+      {"name": "auditeur"}
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "numa-api",
+      "name": "NUMA API",
+      "enabled": true,
+      "bearerOnly": true,
+      "protocol": "openid-connect"
+    },
+    {
+      "clientId": "numa-web",
+      "name": "NUMA Web",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "protocol": "openid-connect",
+      "redirectUris": ["http://localhost:5173/*"],
+      "webOrigins": ["http://localhost:5173"],
+      "attributes": {"pkce.code.challenge.method": "S256"},
+      "protocolMappers": [
+        {
+          "name": "numa-api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {"included.client.audience": "numa-api", "access.token.claim": "true"}
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "kader",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Kader",
+      "lastName": "Yao",
+      "email": "kader.yao@orgatech.ci",
+      "credentials": [{"type": "password", "value": "numa-demo", "temporary": false}],
+      "realmRoles": ["configurateur", "gestionnaire"]
+    },
+    {
+      "username": "admin.numa",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Admin",
+      "lastName": "NUMA",
+      "email": "admin@numa.local",
+      "credentials": [{"type": "password", "value": "numa-admin", "temporary": false}],
+      "realmRoles": ["super-admin"]
+    }
+  ]
+}

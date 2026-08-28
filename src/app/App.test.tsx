@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { CssBaseline, ThemeProvider } from '@mui/material'
 import { App } from './App'
 import { numaTheme } from './theme'
-import { AUTH_STORAGE_KEY, sanitizeReturnTo, serializeDemoAuthSession } from './AuthContext'
+import { AUTH_STORAGE_KEY, restoreOidcReturnTo, sanitizeReturnTo, serializeDemoAuthSession } from './AuthContext'
 
 function renderApp(path = '/', authenticated = true) {
   if (authenticated) window.localStorage.setItem(AUTH_STORAGE_KEY, serializeDemoAuthSession('2026-08-15T12:00:00.000Z'))
@@ -57,6 +57,18 @@ describe('NUMA application shell', () => {
     expect(sanitizeReturnTo('https://example.com')).toBe('/')
     expect(sanitizeReturnTo('//example.com')).toBe('/')
     expect(sanitizeReturnTo('/mfa?returnTo=/administration')).toBe('/')
+  })
+
+  it('notifies the router after restoring the OIDC destination', () => {
+    const navigationListener = vi.fn()
+    window.addEventListener('popstate', navigationListener)
+
+    restoreOidcReturnTo({ returnTo: '/courriers/externes?view=drafts' })
+
+    expect(window.location.pathname).toBe('/courriers/externes')
+    expect(window.location.search).toBe('?view=drafts')
+    expect(navigationListener).toHaveBeenCalledOnce()
+    window.removeEventListener('popstate', navigationListener)
   })
 
   it('completes the SSO and MFA journey before returning to the requested page', async () => {

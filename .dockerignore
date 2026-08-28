@@ -1,0 +1,14 @@
+.git
+.idea
+.env
+.venv
+node_modules
+dist
+coverage
+test-results
+playwright-report
+backend/media
+backend/staticfiles
+**/__pycache__
+**/*.pyc
+*.log

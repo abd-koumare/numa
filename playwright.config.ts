@@ -20,20 +20,19 @@ export default defineConfig({
     },
   },
   webServer: {
-    command: 'npm.cmd run preview -- --host 127.0.0.1 --port 4173',
+    command: 'npm run preview -- --host 127.0.0.1 --port 4173',
     port: 4173,
     reuseExistingServer: true,
   },
   projects: [
     {
-      name: 'desktop-edge',
-      use: { ...devices['Desktop Chrome'], channel: 'msedge' },
+      name: 'desktop-chromium',
+      use: { ...devices['Desktop Chrome'] },
     },
     {
-      name: 'mobile-edge',
+      name: 'mobile-chromium',
       use: {
         ...devices['Pixel 7'],
-        channel: 'msedge',
       },
     },
   ],

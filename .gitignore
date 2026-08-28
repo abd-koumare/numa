@@ -12,3 +12,13 @@ vite.config.js
 vite.config.d.ts
 playwright.config.js
 playwright.config.d.ts
+.env
+.env.production
+offline-kit/
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+backend/media/
+backend/staticfiles/

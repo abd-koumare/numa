@@ -41,10 +41,15 @@ import { PriorityBadge } from '../components/PriorityBadge'
 import { StatusChip } from '../components/StatusChip'
 import { externalCorrespondences } from '../data/correspondences'
 import type { BusinessStatus, Correspondence, Priority } from '../types/ui'
+import { API_DATA_ENABLED } from '../api/client'
+import { useCorrespondences, type CorrespondenceQuery } from '../api/correspondences'
 
 const PAGE_SIZE = 10
 const statuses: BusinessStatus[] = ['À traiter', 'En validation', 'Validé', 'Brouillon', 'Rejeté', 'Annulé', 'Signé']
 const priorities: Priority[] = ['Basse', 'Normale', 'Haute', 'Urgente']
+const statusCodes: Record<BusinessStatus, string> = { 'À traiter': 'to_process', 'En validation': 'in_validation', Validé: 'validated', Brouillon: 'draft', Rejeté: 'rejected', Annulé: 'cancelled', Signé: 'signed', Enregistré: 'registered', Archivé: 'archived' }
+const priorityCodes: Record<Priority, string> = { Basse: 'low', Normale: 'normal', Haute: 'high', Urgente: 'urgent' }
+const confidentialityCodes: Record<string, string> = { Standard: 'standard', Restreint: 'restricted', Confidentiel: 'confidential' }
 const dateFormatter = new Intl.DateTimeFormat('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })
 
 type RegistryView = 'all' | 'mine' | 'grouped' | 'todo' | 'validation' | 'validated' | 'drafts'
@@ -193,9 +198,14 @@ export type CorrespondenceRegistryConfig = {
 type CorrespondenceRegistryPageProps = {
   items: Correspondence[]
   config: CorrespondenceRegistryConfig
+  server?: {
+    count: number
+    loading: boolean
+    setQuery: (query: CorrespondenceQuery) => void
+  }
 }
 
-export function CorrespondenceRegistryPage({ items, config }: CorrespondenceRegistryPageProps) {
+export function CorrespondenceRegistryPage({ items, config, server }: CorrespondenceRegistryPageProps) {
   const [searchParams, setSearchParams] = useSearchParams()
   const [loading, setLoading] = useState(true)
   const [exported, setExported] = useState(false)
@@ -213,6 +223,34 @@ export function CorrespondenceRegistryPage({ items, config }: CorrespondenceRegi
   const hasFilters = Boolean(query || direction || status || priority || confidentiality || from || to || view !== 'all')
   const forcedError = searchParams.get('state') === 'error'
   const paramsKey = searchParams.toString()
+  const setServerQuery = server?.setQuery
+
+  useEffect(() => {
+    if (!setServerQuery) return
+    const selectedStatus = status ? statusCodes[status as BusinessStatus] : ''
+    const viewFilter: Pick<CorrespondenceQuery, 'status' | 'statuses' | 'mine'> =
+      view === 'todo' ? { status: 'to_process' }
+        : view === 'validation' ? { status: 'in_validation' }
+          : view === 'validated' ? { statuses: 'validated,signed' }
+            : view === 'drafts' ? { status: 'draft' }
+              : view === 'mine' ? { mine: true }
+                : {}
+    const timer = window.setTimeout(() => setServerQuery({
+      page: Number.isFinite(requestedPage) ? Math.max(requestedPage, 1) : 1,
+      pageSize: view === 'grouped' ? 100 : PAGE_SIZE,
+      search: query.trim(),
+      direction,
+      status: selectedStatus || viewFilter.status,
+      statuses: selectedStatus ? undefined : viewFilter.statuses,
+      mine: viewFilter.mine,
+      priority: priority ? priorityCodes[priority as Priority] : '',
+      confidentiality: confidentiality ? confidentialityCodes[confidentiality] : '',
+      receivedFrom: from,
+      receivedTo: to,
+      ordering: '-received_at',
+    }), 250)
+    return () => window.clearTimeout(timer)
+  }, [confidentiality, direction, from, priority, query, requestedPage, setServerQuery, status, to, view])
 
   useEffect(() => {
     setLoading(true)
@@ -232,6 +270,7 @@ export function CorrespondenceRegistryPage({ items, config }: CorrespondenceRegi
 
   const filteredItems = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase('fr')
+    if (server) return items
     return items.filter((item) => {
       const searchable = [item.reference, item.subject, item.sender, item.direction].join(' ').toLocaleLowerCase('fr')
       return (
@@ -245,15 +284,17 @@ export function CorrespondenceRegistryPage({ items, config }: CorrespondenceRegi
         matchesView(item, view)
       )
     })
-  }, [confidentiality, direction, from, items, priority, query, status, to, view])
+  }, [confidentiality, direction, from, items, priority, query, server, status, to, view])
 
   const directions = useMemo(() => [...new Set(items.map((item) => item.direction))].sort(), [items])
 
-  const totalPages = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE))
+  const resultCount = server?.count ?? filteredItems.length
+  const totalPages = Math.max(1, Math.ceil(resultCount / PAGE_SIZE))
   const page = Number.isFinite(requestedPage) ? Math.min(Math.max(requestedPage, 1), totalPages) : 1
-  const pageItems = filteredItems.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
-  const resultStart = filteredItems.length ? (page - 1) * PAGE_SIZE + 1 : 0
-  const resultEnd = Math.min(page * PAGE_SIZE, filteredItems.length)
+  const pageItems = server ? filteredItems : filteredItems.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const resultStart = resultCount ? (page - 1) * PAGE_SIZE + 1 : 0
+  const resultEnd = Math.min(page * PAGE_SIZE, resultCount)
+  const isLoading = server?.loading ?? loading
 
   return (
     <Box sx={{ maxWidth: 1440, mx: 'auto', px: { xs: 2, sm: 3, lg: 4 }, py: { xs: 3, md: 4 } }}>
@@ -316,12 +357,12 @@ export function CorrespondenceRegistryPage({ items, config }: CorrespondenceRegi
         {advancedOpen ? <Box sx={{ px: 2, pb: 2, display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' }, gap: 1.5 }}><TextField select size="small" label="Confidentialité" value={confidentiality} onChange={(event) => updateParam('confidentiality', event.target.value)}><MenuItem value="">Toutes</MenuItem><MenuItem value="Standard">Standard</MenuItem><MenuItem value="Restreint">Restreint</MenuItem><MenuItem value="Confidentiel">Confidentiel</MenuItem></TextField><TextField type="date" size="small" label="Reçu depuis le" value={from} onChange={(event) => updateParam('from', event.target.value)} slotProps={{ inputLabel: { shrink: true } }} /><TextField type="date" size="small" label="Reçu jusqu’au" value={to} onChange={(event) => updateParam('to', event.target.value)} slotProps={{ inputLabel: { shrink: true } }} /></Box> : null}
         <Box
           data-testid="registry-loading-slot"
-          aria-hidden={!loading}
+          aria-hidden={!isLoading}
           sx={{ height: 4, overflow: 'hidden' }}
         >
           <LinearProgress
             aria-label="Actualisation du registre"
-            sx={{ height: 4, visibility: loading ? 'visible' : 'hidden' }}
+            sx={{ height: 4, visibility: isLoading ? 'visible' : 'hidden' }}
           />
         </Box>
       </Card>
@@ -330,12 +371,12 @@ export function CorrespondenceRegistryPage({ items, config }: CorrespondenceRegi
         <Alert severity="error" icon={<ErrorOutline />} action={<Button color="inherit" onClick={resetFilters}>Réessayer</Button>}>
           Impossible de charger le registre. Les données simulées restent intactes.
         </Alert>
-      ) : !loading && !pageItems.length ? (
+      ) : !isLoading && !pageItems.length ? (
         <EmptyState filtered={hasFilters} onReset={resetFilters} />
       ) : view === 'grouped' ? (
         <GroupedRegistry items={filteredItems} basePath={config.basePath} />
       ) : (
-        <Card aria-busy={loading}>
+        <Card aria-busy={isLoading}>
           <Box sx={{ display: { xs: 'none', md: 'block' } }}>
             <TableContainer>
               <Table aria-label={config.tableLabel}>
@@ -414,7 +455,7 @@ export function CorrespondenceRegistryPage({ items, config }: CorrespondenceRegi
           <Divider />
           <Stack direction={{ xs: 'column', sm: 'row' }} alignItems={{ sm: 'center' }} justifyContent="space-between" spacing={1.5} sx={{ px: 2.5, py: 1.75 }}>
             <Typography variant="caption" color="text.secondary">
-              Affichage {resultStart}–{resultEnd} sur {filteredItems.length} résultat{filteredItems.length > 1 ? 's' : ''}
+              Affichage {resultStart}–{resultEnd} sur {resultCount} résultat{resultCount > 1 ? 's' : ''}
             </Typography>
             <Pagination
               page={page}
@@ -459,5 +500,7 @@ export const externalRegistryConfig: CorrespondenceRegistryConfig = {
 }
 
 export function ExternalRegistryPage() {
-  return <CorrespondenceRegistryPage items={externalCorrespondences} config={externalRegistryConfig} />
+  const { items, count, setQuery, error, loading } = useCorrespondences('external', externalCorrespondences, { pageSize: PAGE_SIZE })
+  if (error) return <Box sx={{ maxWidth: 900, mx: 'auto', p: 3 }}><Alert severity="error">{error}</Alert></Box>
+  return <CorrespondenceRegistryPage items={items} config={externalRegistryConfig} server={API_DATA_ENABLED ? { count, loading, setQuery } : undefined} />
 }

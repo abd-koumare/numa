@@ -1,0 +1,9 @@
+[Unit]
+Description=Sauvegarde chiffrée NUMA
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/numa
+ExecStart=/opt/numa/scripts/numa-backup.sh both

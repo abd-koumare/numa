@@ -18,7 +18,7 @@ import {
   WorkflowBuilderPage,
 } from '../pages/AdministrationPages'
 import { ActivityPage, GlobalSearchPage } from '../pages/SearchAndActivityPages'
-import { IdentityPage, ProfilePage, SystemStatesPage } from '../pages/IdentityAndSystemPages'
+import { IdentityPage, IdentityProvidersPage, ProfilePage, SystemStatesPage } from '../pages/IdentityAndSystemPages'
 import { SiteSettingsProvider } from './SiteSettingsContext'
 import { SiteBrandingPage } from '../pages/SiteBrandingPage'
 import { AuthProvider, sanitizeReturnTo, useAuth } from './AuthContext'
@@ -30,22 +30,25 @@ import { CompleteAuditPage, CompleteBackupsPage, CompleteOperationsPage } from '
 import { NotificationsPage } from '../pages/NotificationsPage'
 
 function AnonymousOnlyRoute({ children }: { children: ReactNode }) {
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, isLoading } = useAuth()
   const location = useLocation()
   const returnTo = sanitizeReturnTo(new URLSearchParams(location.search).get('returnTo'))
+  if (isLoading) return null
   return isAuthenticated ? <Navigate to={returnTo} replace /> : children
 }
 
 function ProtectedApplication() {
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, isLoading, session } = useAuth()
   const location = useLocation()
 
+  if (isLoading) return null
   if (!isAuthenticated) {
     const returnTo = `${location.pathname}${location.search}${location.hash}`
     return <Navigate to={`/connexion?returnTo=${encodeURIComponent(returnTo)}`} replace />
   }
+  if (session?.user.accessPending) return <Navigate to="/acces-refuse" replace />
 
-  return <AppShell><ShellRoutes /></AppShell>
+  return <PrototypeDataProvider><AppShell><ShellRoutes /></AppShell></PrototypeDataProvider>
 }
 
 function ShellRoutes() {
@@ -84,6 +87,7 @@ function ShellRoutes() {
           <Route path="/administration/site" element={<SiteBrandingPage />} />
           <Route path="/administration/navigation" element={<NavigationSettingsPage />} />
           <Route path="/administration/utilisateurs" element={<UsersPage />} />
+          <Route path="/administration/fournisseurs-identite" element={<IdentityProvidersPage />} />
           <Route path="/administration/utilisateurs/nouveau" element={<AddUserPage />} />
           <Route path="/administration/utilisateurs/:id" element={<UserDetailPage />} />
           <Route path="/administration/groupes" element={<GroupsPage />} />
@@ -121,7 +125,6 @@ export function App() {
   return (
     <SiteSettingsProvider>
       <AuthProvider>
-        <PrototypeDataProvider>
           <BrowserRouter>
             <Routes>
             <Route path="/connexion" element={<AnonymousOnlyRoute><IdentityPage mode="login" /></AnonymousOnlyRoute>} />
@@ -131,7 +134,6 @@ export function App() {
             <Route path="*" element={<ProtectedApplication />} />
             </Routes>
           </BrowserRouter>
-        </PrototypeDataProvider>
       </AuthProvider>
     </SiteSettingsProvider>
   )

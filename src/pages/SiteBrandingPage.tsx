@@ -1,4 +1,4 @@
-import { type ChangeEvent, useState } from 'react'
+import { type ChangeEvent, useEffect, useState } from 'react'
 import CloudUploadOutlined from '@mui/icons-material/CloudUploadOutlined'
 import RestartAlt from '@mui/icons-material/RestartAlt'
 import SaveOutlined from '@mui/icons-material/SaveOutlined'
@@ -26,6 +26,9 @@ export function SiteBrandingPage() {
   const [draft, setDraft] = useState<SiteBrandingSettings>(branding)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => setDraft(branding), [branding])
 
   const chooseLogo = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -71,20 +74,31 @@ export function SiteBrandingPage() {
     reader.readAsDataURL(file)
   }
 
-  const save = () => {
-    saveBranding({
-      ...draft,
-      organizationName: draft.organizationName.trim(),
-      applicationName: draft.applicationName.trim(),
-    })
-    setMessage('Identité visuelle enregistrée')
+  const save = async () => {
+    setSaving(true)
+    setError('')
+    try {
+      await saveBranding({ ...draft, organizationName: draft.organizationName.trim(), applicationName: draft.applicationName.trim() })
+      setMessage('Identité visuelle enregistrée')
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'L’identité visuelle n’a pas pu être enregistrée.')
+    } finally {
+      setSaving(false)
+    }
   }
 
-  const restoreNuma = () => {
-    resetLogo()
-    setDraft((current) => ({ ...current, logoDataUrl: null, logoFileName: null, logoMimeType: null }))
-    setError('')
-    setMessage('Logo NUMA restauré')
+  const restoreNuma = async () => {
+    setSaving(true)
+    try {
+      await resetLogo()
+      setDraft((current) => ({ ...current, logoDataUrl: null, logoFileName: null, logoMimeType: null }))
+      setError('')
+      setMessage('Logo NUMA restauré')
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Le logo NUMA n’a pas pu être restauré.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const logoSource = draft.logoDataUrl ?? '/numa-logo.svg'
@@ -99,13 +113,13 @@ export function SiteBrandingPage() {
             Personnalisez la marque affichée aux utilisateurs de votre organisation.
           </Typography>
         </Box>
-        <Button variant="contained" startIcon={<SaveOutlined />} disabled={!draft.organizationName.trim() || !draft.applicationName.trim()} onClick={save}>
-          Enregistrer
+        <Button variant="contained" startIcon={<SaveOutlined />} disabled={saving || !draft.organizationName.trim() || !draft.applicationName.trim()} onClick={() => void save()}>
+          {saving ? 'Enregistrement…' : 'Enregistrer'}
         </Button>
       </Stack>
 
       <Alert severity="info" sx={{ mb: 2.5 }}>
-        Le logo personnalisé remplace le logo NUMA dans la navigation et la connexion. PNG ou SVG, 2 Mo maximum. Les SVG devront être assainis par le futur backend avant stockage définitif.
+        Le logo personnalisé remplace le logo NUMA dans la navigation et la connexion. PNG ou SVG, 2 Mo maximum. Les SVG sont contrôlés et assainis côté serveur.
       </Alert>
 
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 1.1fr) minmax(360px, .9fr)' }, gap: 2.5, alignItems: 'start' }}>
@@ -126,7 +140,7 @@ export function SiteBrandingPage() {
                   <input aria-label="Choisir un logo PNG ou SVG" hidden type="file" accept=".png,.svg,image/png,image/svg+xml" onChange={chooseLogo} />
                 </Button>
                 {draft.logoDataUrl ? <Button color="error" onClick={() => setDraft((current) => ({ ...current, logoDataUrl: null, logoFileName: null, logoMimeType: null }))}>Retirer</Button> : null}
-                <Button startIcon={<RestartAlt />} onClick={restoreNuma}>Restaurer NUMA</Button>
+                <Button startIcon={<RestartAlt />} disabled={saving} onClick={() => void restoreNuma()}>Restaurer NUMA</Button>
               </Stack>
               {draft.logoFileName ? <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1.5 }}><Chip label={draft.logoMimeType === 'image/svg+xml' ? 'SVG' : 'PNG'} size="small" color="success" variant="outlined" /><Typography variant="caption" color="text.secondary">{draft.logoFileName}</Typography></Stack> : null}
               {error ? <Alert severity="error" sx={{ mt: 1.5 }}>{error}</Alert> : null}

@@ -9,6 +9,8 @@ const statusStyles: Record<BusinessStatus, { color: string; background: string }
   Rejeté: { color: '#B91C1C', background: '#FEF2F2' },
   Annulé: { color: '#7F1D1D', background: '#FFF1F2' },
   Signé: { color: '#087E8B', background: '#ECFEFF' },
+  Enregistré: { color: '#0369A1', background: '#F0F9FF' },
+  Archivé: { color: '#334155', background: '#F8FAFC' },
 }
 
 type StatusChipProps = {

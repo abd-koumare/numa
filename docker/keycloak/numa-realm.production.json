@@ -1,0 +1,78 @@
+{
+  "realm": "numa",
+  "enabled": true,
+  "displayName": "NUMA",
+  "loginTheme": "numa",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": true,
+  "rememberMe": true,
+  "verifyEmail": true,
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "failureFactor": 5,
+  "waitIncrementSeconds": 60,
+  "maxFailureWaitSeconds": 900,
+  "passwordPolicy": "length(12) and upperCase(1) and lowerCase(1) and digits(1) and specialChars(1) and notUsername(undefined)",
+  "roles": {
+    "realm": [
+      {"name": "super-admin"}, {"name": "admin"}, {"name": "configurateur"},
+      {"name": "gestionnaire"}, {"name": "validateur"}, {"name": "utilisateur"},
+      {"name": "lecteur"}, {"name": "auditeur"}
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "numa-api",
+      "name": "NUMA API",
+      "enabled": true,
+      "bearerOnly": true,
+      "protocol": "openid-connect"
+    },
+    {
+      "clientId": "numa-web",
+      "name": "NUMA Web",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "frontchannelLogout": true,
+      "protocol": "openid-connect",
+      "rootUrl": "__NUMA_PUBLIC_URL__",
+      "baseUrl": "__NUMA_PUBLIC_URL__/",
+      "redirectUris": ["__NUMA_PUBLIC_URL__/*"],
+      "webOrigins": ["__NUMA_PUBLIC_URL__"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "__NUMA_PUBLIC_URL__/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "numa-api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {"included.client.audience": "numa-api", "access.token.claim": "true"}
+        },
+        {
+          "name": "groups",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "consentRequired": false,
+          "config": {"full.path": "true", "claim.name": "groups", "access.token.claim": "true", "id.token.claim": "true", "userinfo.token.claim": "true"}
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "__NUMA_BOOTSTRAP_ADMIN_USERNAME__",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Administrateur",
+      "lastName": "NUMA",
+      "email": "numa-admin@localhost.invalid",
+      "credentials": [{"type": "password", "value": "__NUMA_BOOTSTRAP_ADMIN_PASSWORD__", "temporary": true}],
+      "realmRoles": ["super-admin"]
+    }
+  ]
+}
