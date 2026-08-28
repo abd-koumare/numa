@@ -2,6 +2,10 @@
 
 NUMA est une plateforme configurable de gestion des courriers et processus métier. Le dépôt contient le frontend React/Vite, l’API Django REST et une pile Docker complète : PostgreSQL, Redis/Celery, MinIO, ClamAV, Keycloak et Caddy.
 
+## Documentation
+
+- [Guide simple des images Docker et de leur configuration](docs/docker-images-and-setup.md)
+
 ## Démarrage local
 
 Prérequis : Docker Desktop relié à WSL, Docker Compose et au moins 4 Gio de mémoire disponible.

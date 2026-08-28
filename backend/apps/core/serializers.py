@@ -1435,7 +1435,7 @@ class GenericListItemSerializer(serializers.ModelSerializer):
 
     @transaction.atomic
     def update(self, instance, validated_data):
-        locked = GenericListItem.objects.select_for_update().select_related(
+        locked = GenericListItem.objects.select_for_update(of=("self",)).select_related(
             "instance__definition",
             "instance__configuration_version",
             "configuration_bundle",

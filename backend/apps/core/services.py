@@ -805,7 +805,7 @@ def transition_correspondence(correspondence: Correspondence, action: str, actor
     if action not in TRANSITIONS:
         raise serializers.ValidationError({"action": "Transition inconnue."})
     allowed_from, target_status, capability = TRANSITIONS[action]
-    item = Correspondence.objects.select_for_update().select_related(
+    item = Correspondence.objects.select_for_update(of=("self",)).select_related(
         "direction",
         "responsible_service",
         "created_by",
@@ -917,7 +917,7 @@ def transition_correspondence(correspondence: Correspondence, action: str, actor
 
 @transaction.atomic
 def sign_correspondence(correspondence, actor, document_version, level, request=None, graphic_mark=""):
-    item = Correspondence.objects.select_for_update().select_related(
+    item = Correspondence.objects.select_for_update(of=("self",)).select_related(
         "created_by",
         "direction",
         "responsible_service",

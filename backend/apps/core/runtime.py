@@ -83,7 +83,11 @@ def resolve_runtime_bundle(
     *,
     list_version: ConfigurationVersion | None = None,
 ) -> RuntimeConfigurationBundle:
-    definition = ConfigurationDefinition.objects.select_for_update().select_related("current_version").get(pk=definition.pk)
+    definition = (
+        ConfigurationDefinition.objects.select_for_update(of=("self",))
+        .select_related("current_version")
+        .get(pk=definition.pk)
+    )
     if list_version is not None:
         list_version = ConfigurationVersion.objects.filter(
             pk=list_version.pk,
