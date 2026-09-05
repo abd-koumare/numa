@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { API_DATA_ENABLED, ApiError, apiFetch, ifMatch } from './client'
+import { API_DATA_ENABLED, ApiError, apiFetch, apiFetchBlob, ifMatch } from './client'
 
 export type ConfigurationKind = 'list' | 'form' | 'view' | 'numbering' | 'rule' | 'workflow' | 'page' | 'template' | 'navigation' | 'branding' | 'system' | 'signature_policy'
 export type ConfigurationState = 'draft' | 'published' | 'archived'
@@ -114,6 +114,19 @@ export async function saveConfiguration(input: {
 
 export async function configurationVersions(definitionId: string) {
   return apiFetch<ConfigurationVersion[]>(`/configurations/${definitionId}/versions/`)
+}
+
+export async function instantiateTemplate(definitionId: string, input: { slug: string; name: string; description: string }) {
+  return apiFetch<ConfigurationDefinition>(`/configurations/${definitionId}/instantiate/`, { method: 'POST', body: JSON.stringify(input) })
+}
+
+export async function renderTemplate(definitionId: string, context: Record<string, unknown>) {
+  return apiFetchBlob(`/configurations/${definitionId}/render-document/`, { method: 'POST', body: JSON.stringify({ context }) })
+}
+
+export type PublishedPage = { slug: string; name: string; version: number; data: { blocks: Record<string, unknown>[]; audience?: string[] } }
+export function getPublishedPage(slug: string, signal?: AbortSignal) {
+  return apiFetch<PublishedPage>(`/runtime/pages/${encodeURIComponent(slug)}/`, { signal })
 }
 
 export async function rollbackConfiguration(definition: ConfigurationDefinition, version: number) {

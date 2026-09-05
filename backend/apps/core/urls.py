@@ -1,5 +1,6 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
+from .runtime_views import field_choices, published_form, published_page
 
 from .views import (
     AccessGroupViewSet,
@@ -52,6 +53,9 @@ router.register("list-items", GenericListItemViewSet, basename="list-item")
 router.register("system-settings", SystemSettingViewSet, basename="system-setting")
 
 urlpatterns = [
+    path("runtime/pages/<slug:slug>/", published_page, name="published-page"),
+    path("runtime/forms/<slug:slug>/", published_form, name="published-form"),
+    path("runtime/choices/<slug:kind>/", field_choices, name="field-choices"),
     path("health/", health, name="health"),
     path("public-config/", public_config, name="public-config"),
     path("setup/", initial_setup, name="initial-setup"),

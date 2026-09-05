@@ -1,4 +1,5 @@
-import { type ReactNode } from 'react'
+import { type ReactNode, useMemo } from 'react'
+import { CssBaseline, ThemeProvider } from '@mui/material'
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AppShell } from '../components/AppShell'
 import { DashboardPage } from '../pages/DashboardPage'
@@ -19,7 +20,8 @@ import {
 } from '../pages/AdministrationPages'
 import { ActivityPage, GlobalSearchPage } from '../pages/SearchAndActivityPages'
 import { IdentityPage, IdentityProvidersPage, ProfilePage, SystemStatesPage } from '../pages/IdentityAndSystemPages'
-import { SiteSettingsProvider } from './SiteSettingsContext'
+import { SiteSettingsProvider, useSiteSettings } from './SiteSettingsContext'
+import { createNumaTheme } from './theme'
 import { SiteBrandingPage } from '../pages/SiteBrandingPage'
 import { AuthProvider, sanitizeReturnTo, useAuth } from './AuthContext'
 import { PrototypeDataProvider } from './PrototypeDataContext'
@@ -28,6 +30,7 @@ import { InstancesManagementPage, ListCreationWizardPage, ListsCatalogPage, Navi
 import { FieldFormBuilderPage, PagesCatalogPage, TemplateDetailPage, TemplatesCatalogPage, WorkflowsCatalogPage } from '../pages/AdvancedBuilderPages'
 import { CompleteAuditPage, CompleteBackupsPage, CompleteOperationsPage } from '../pages/GovernancePages'
 import { NotificationsPage } from '../pages/NotificationsPage'
+import { PublishedPage } from '../pages/PublishedPage'
 
 function AnonymousOnlyRoute({ children }: { children: ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth()
@@ -54,7 +57,8 @@ function ProtectedApplication() {
 function ShellRoutes() {
   return (
     <Routes>
-          <Route path="/" element={<DashboardPage />} />
+          <Route path="/" element={<ConfiguredHomePage />} />
+          <Route path="/pages/:slug" element={<PublishedPage />} />
           <Route path="/courriers" element={<CorrespondenceOverviewPage />} />
           <Route path="/courriers/nouveau" element={<CorrespondenceFormPage />} />
           <Route path="/courriers/internes" element={<InternalRegistryPage />} />
@@ -99,6 +103,7 @@ function ShellRoutes() {
           <Route path="/administration/listes" element={<ListsCatalogPage />} />
           <Route path="/administration/listes/nouvelle" element={<ListCreationWizardPage />} />
           <Route path="/administration/listes/:id/formulaire" element={<FieldFormBuilderPage />} />
+          <Route path="/administration/formulaires/:formId" element={<FieldFormBuilderPage />} />
           <Route path="/administration/listes/:id" element={<ListBuilderPage />} />
           <Route path="/administration/regles" element={<RulesCatalogPage />} />
           <Route path="/administration/regles/nouvelle" element={<RuleBuilderPage />} />
@@ -121,20 +126,45 @@ function ShellRoutes() {
   )
 }
 
-export function App() {
+function ConfiguredHomePage() {
+  const { branding, loading } = useSiteSettings()
+  if (loading) return null
+  if (branding.defaultHome === 'tasks') return <Navigate to="/taches" replace />
+  if (branding.defaultHome === 'correspondence') return <Navigate to="/courriers" replace />
+  if (branding.defaultHome === 'page' && branding.homePageSlug) return <PublishedPage slug={branding.homePageSlug} />
+  return <DashboardPage />
+}
+
+function ConfiguredApplication() {
+  const { branding } = useSiteSettings()
+  const theme = useMemo(() => createNumaTheme({
+    primaryColor: branding.primaryColor,
+    accentColor: branding.accentColor,
+    fontFamily: branding.fontFamily,
+  }), [branding.primaryColor, branding.accentColor, branding.fontFamily])
+
   return (
-    <SiteSettingsProvider>
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
       <AuthProvider>
-          <BrowserRouter>
-            <Routes>
+        <BrowserRouter>
+          <Routes>
             <Route path="/connexion" element={<AnonymousOnlyRoute><IdentityPage mode="login" /></AnonymousOnlyRoute>} />
             <Route path="/mfa" element={<AnonymousOnlyRoute><IdentityPage mode="mfa" /></AnonymousOnlyRoute>} />
             <Route path="/acces-refuse" element={<IdentityPage mode="denied" />} />
             <Route path="/session-expiree" element={<IdentityPage mode="expired" />} />
             <Route path="*" element={<ProtectedApplication />} />
-            </Routes>
-          </BrowserRouter>
+          </Routes>
+        </BrowserRouter>
       </AuthProvider>
+    </ThemeProvider>
+  )
+}
+
+export function App() {
+  return (
+    <SiteSettingsProvider>
+      <ConfiguredApplication />
     </SiteSettingsProvider>
   )
 }

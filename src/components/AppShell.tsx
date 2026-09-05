@@ -79,11 +79,30 @@ export function AppShell({ children }: AppShellProps) {
   const desktop = useMediaQuery(theme.breakpoints.up('md'))
   const { branding } = useSiteSettings()
   const { logout, session } = useAuth()
-  const { notifications, markNotificationRead } = usePrototypeData()
+  const { notifications, markNotificationRead, navigationEntries } = usePrototypeData()
   const unreadNotifications = notifications.filter((item) => !item.read).length
   const displayUser = session?.user ?? currentUser
   const capabilities = new Set(displayUser.capabilities ?? [])
-  const visibleNavigation = navigation
+  const baseNavigationById = new Map<string, NavGroup>([
+    ['nav-home', navigation[0]],
+    ['nav-mail', { ...navigation[1], children: navigation[1].children?.filter((item) => item.path !== '/taches') }],
+    ['nav-tasks', { label: 'Mes tâches', path: '/taches', icon: 'tasks' }],
+    ['nav-admin', navigation[2]],
+  ])
+  const configuredNavigation = navigationEntries.length
+    ? navigationEntries
+      .filter((entry) => entry.enabled)
+      .filter((entry) => entry.visibility !== 'Administrateurs' || capabilities.has('configuration.read'))
+      .map((entry) => {
+        const base = baseNavigationById.get(entry.id)
+        return {
+          ...(base ?? { label: entry.label, path: entry.path, icon: 'page' as const }),
+          label: entry.label,
+          path: entry.path,
+        }
+      })
+    : navigation
+  const visibleNavigation = configuredNavigation
     .filter((group) => !group.permissions?.length || group.permissions.some((permission) => capabilities.has(permission)))
     .map((group) => ({
       ...group,

@@ -1,3 +1,4 @@
+import { ConnectedCorrespondenceForm } from './ConnectedCorrespondenceForm'
 import { type FormEvent, useEffect, useRef, useState } from 'react'
 import ArrowBack from '@mui/icons-material/ArrowBack'
 import AttachFileOutlined from '@mui/icons-material/AttachFileOutlined'
@@ -39,6 +40,10 @@ const responsibleServices = [
 ]
 
 export function CorrespondenceFormPage() {
+  return API_DATA_ENABLED ? <ConnectedCorrespondenceForm /> : <DemoCorrespondenceFormPage />
+}
+
+function DemoCorrespondenceFormPage() {
   const navigate = useNavigate()
   const { id } = useParams()
   const editing = Boolean(id)

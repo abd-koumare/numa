@@ -1,3 +1,4 @@
+import { useConfigurations } from '../api/configurations'
 import { type ChangeEvent, useEffect, useState } from 'react'
 import CloudUploadOutlined from '@mui/icons-material/CloudUploadOutlined'
 import RestartAlt from '@mui/icons-material/RestartAlt'
@@ -22,6 +23,7 @@ import type { SiteBrandingSettings } from '../types/ui'
 const MAX_LOGO_SIZE = 2 * 1024 * 1024
 
 export function SiteBrandingPage() {
+  const { data: pages } = useConfigurations('page')
   const { branding, saveBranding, resetLogo } = useSiteSettings()
   const [draft, setDraft] = useState<SiteBrandingSettings>(branding)
   const [error, setError] = useState('')
@@ -113,7 +115,7 @@ export function SiteBrandingPage() {
             Personnalisez la marque affichée aux utilisateurs de votre organisation.
           </Typography>
         </Box>
-        <Button variant="contained" startIcon={<SaveOutlined />} disabled={saving || !draft.organizationName.trim() || !draft.applicationName.trim()} onClick={() => void save()}>
+        <Button variant="contained" startIcon={<SaveOutlined />} disabled={saving || !draft.organizationName.trim() || !draft.applicationName.trim() || (draft.defaultHome === 'page' && !draft.homePageSlug)} onClick={() => void save()}>
           {saving ? 'Enregistrement…' : 'Enregistrer'}
         </Button>
       </Stack>
@@ -153,7 +155,7 @@ export function SiteBrandingPage() {
             </Box>
             <TextField label="Image ou bannière d’accueil" value={draft.bannerUrl} onChange={(event) => setDraft((current) => ({ ...current, bannerUrl: event.target.value }))} placeholder="https://…" />
             <TextField select label="Typographie" value={draft.fontFamily} onChange={(event) => setDraft((current) => ({ ...current, fontFamily: event.target.value as SiteBrandingSettings['fontFamily'] }))}><MenuItem value="NUMA">Typographie NUMA</MenuItem><MenuItem value="Organisation">Typographie de l’organisation</MenuItem></TextField>
-            <TextField select label="Page d’accueil par défaut" value={draft.defaultHome} onChange={(event) => setDraft((current) => ({ ...current, defaultHome: event.target.value as SiteBrandingSettings['defaultHome'] }))}><MenuItem value="dashboard">Tableau de bord</MenuItem><MenuItem value="tasks">Mes tâches</MenuItem><MenuItem value="correspondence">Courriers</MenuItem></TextField>
+            <TextField select label="Page d’accueil par défaut" value={draft.defaultHome} onChange={(event) => setDraft((current) => ({ ...current, defaultHome: event.target.value as SiteBrandingSettings['defaultHome'] }))}><MenuItem value="dashboard">Tableau de bord</MenuItem><MenuItem value="tasks">Mes tâches</MenuItem><MenuItem value="correspondence">Courriers</MenuItem><MenuItem value="page">Page publiée</MenuItem></TextField>{draft.defaultHome === 'page' ? <TextField select label="Page publiée à l’accueil" value={draft.homePageSlug ?? ''} onChange={(event) => setDraft({ ...draft, homePageSlug: event.target.value })}><MenuItem value="">Choisir une page</MenuItem>{pages.filter((page) => page.current_version).map((page) => <MenuItem key={page.id} value={page.slug}>{page.name}</MenuItem>)}</TextField> : null}
             <TextField label="Mention de pied de page" value={draft.footerText} onChange={(event) => setDraft((current) => ({ ...current, footerText: event.target.value }))} />
             <Button component="label" variant="outlined" startIcon={<CloudUploadOutlined />}>Importer un favicon<input aria-label="Choisir un favicon PNG ou SVG" hidden type="file" accept=".png,.svg,image/png,image/svg+xml" onChange={chooseFavicon} /></Button>
             {draft.faviconDataUrl ? <Chip label="Favicon prêt à être publié" color="success" variant="outlined" /> : null}

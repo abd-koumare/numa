@@ -1,4 +1,6 @@
 .venv
+.env
+.env.*
 media
 staticfiles
 db.sqlite3

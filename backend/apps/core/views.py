@@ -104,6 +104,8 @@ from .services import (
     transition_correspondence,
 )
 from .tasks import create_backup, process_transfer_job, scan_document
+from .runtime import configuration_data
+from .templates import TemplateRuntimeError, render_document_template
 
 
 def _dependency_status():
@@ -181,6 +183,7 @@ def public_config(request):
             "logo_mime_type": branding_extras.get("logoMimeType"),
             "banner_url": branding_extras.get("bannerUrl", ""),
             "font_family": branding_extras.get("fontFamily", "NUMA"),
+            "home_page_slug": branding_extras.get("homePageSlug", ""),
         },
         "oidc": {
             "authority": settings.OIDC_PUBLIC_ISSUER,
@@ -693,11 +696,49 @@ class ConfigurationDefinitionViewSet(viewsets.ModelViewSet):
         "destroy": Capability.CONFIGURATION_MANAGE,
         "publish": Capability.CONFIGURATION_PUBLISH,
         "rollback": Capability.CONFIGURATION_PUBLISH,
+        "instantiate": Capability.CONFIGURATION_MANAGE,
+        "render_document": Capability.CORRESPONDENCE_READ,
     }
     filterset_fields = ["kind", "active"]
     search_fields = ["slug", "name", "description"]
     ordering_fields = ["kind", "name", "updated_at"]
     http_method_names = ["get", "post", "patch", "delete", "head", "options"]
+
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def instantiate(self, request, pk=None):
+        definition = self.get_object()
+        version = definition.current_version
+        if definition.kind != "template" or not definition.active or not version or version.state != "published":
+            raise ValidationError("Sélectionnez un template publié et actif.")
+        data = configuration_data(version)
+        if data.get("template_type", "configuration") != "configuration" or not isinstance(data.get("payload"), dict):
+            raise ValidationError("Ce template ne contient pas de configuration réutilisable.")
+        serializer = self.get_serializer(data={
+            "kind": data["target_kind"], "slug": request.data.get("slug"),
+            "name": request.data.get("name"), "description": request.data.get("description", ""),
+            "data": data["payload"],
+        })
+        serializer.is_valid(raise_exception=True)
+        created = serializer.save()
+        record_audit(actor=request.user, action="configuration.instantiated", resource_type="configuration",
+                     resource_id=created.id, request=request, metadata={"template_version": str(version.id)})
+        return Response(self.get_serializer(created).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["post"], url_path="render-document")
+    def render_document(self, request, pk=None):
+        definition = self.get_object()
+        version = definition.current_version
+        if not definition.active or not version or version.state != "published":
+            raise ValidationError("Sélectionnez un modèle documentaire publié et actif.")
+        try:
+            output = render_document_template(version, request.data.get("context", {}))
+        except TemplateRuntimeError as exc:
+            raise ValidationError(str(exc)) from exc
+        record_audit(actor=request.user, action="template.rendered", resource_type="configuration",
+                     resource_id=definition.id, request=request, metadata={"version": version.version})
+        return FileResponse(output, as_attachment=True, filename=f"{definition.slug}.docx",
+                            content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
 
     @action(detail=True, methods=["get"])
     def versions(self, request, pk=None):

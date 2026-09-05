@@ -57,10 +57,10 @@ test('page header actions keep their standard height', async ({ page }) => {
   const actionScreens = [
     ['/courriers/externes/import', 'Étape suivante'],
     ['/courriers/externes/ext-0040-2026/signature', 'Apposer la signature'],
-    ['/administration/listes/courriers-externes', 'Publier'],
-    ['/administration/pages/accueil-dt', 'Publier'],
+    ['/administration/listes/courriers-externes', 'Enregistrer et publier'],
+    ['/administration/pages/accueil-dt', 'Enregistrer et publier'],
     ['/administration/templates', 'Nouveau template'],
-    ['/administration/workflows/courrier-externe', 'Publier'],
+    ['/administration/workflows/courrier-externe', 'Enregistrer et publier'],
     ['/administration/sauvegardes', 'Lancer une sauvegarde'],
   ] as const
 
@@ -92,6 +92,32 @@ test('organization branding can be published and survives reload', async ({ page
   await page.evaluate(() => window.localStorage.removeItem('numa.auth.session.v1'))
   await page.goto('/connexion')
   await expect(page.getByAltText('Logo ORGATECH')).toBeVisible()
+})
+
+test('published branding applies colors, banner and the default home', async ({ page }) => {
+  await page.goto('/administration/site')
+  await page.getByLabel('Couleur principale').fill('#663399')
+  await page.getByLabel('Image ou bannière d’accueil').fill('/numa-logo.svg')
+  await page.getByRole('button', { name: 'Enregistrer', exact: true }).click()
+  await page.mouse.move(0, 0)
+  await expect(page.getByRole('button', { name: 'Enregistrer', exact: true })).toHaveCSS('background-color', 'rgb(102, 51, 153)')
+  await page.goto('/')
+  await expect(page.getByRole('img', { name: 'Bannière ORGATECH' })).toHaveAttribute('src', '/numa-logo.svg')
+  await page.goto('/administration/site')
+  await page.getByLabel('Page d’accueil par défaut').click()
+  await page.getByRole('option', { name: 'Mes tâches', exact: true }).click()
+  await page.getByRole('button', { name: 'Enregistrer', exact: true }).click()
+  await page.goto('/')
+  await expect(page).toHaveURL(/\/taches$/)
+})
+
+test('published navigation is applied and survives reload', async ({ page, isMobile }) => {
+  await page.goto('/administration/navigation')
+  await page.getByLabel('Libellé', { exact: true }).first().fill('Mon accueil')
+  await page.getByRole('button', { name: 'Enregistrer et publier', exact: true }).click()
+  await page.reload()
+  if (isMobile) await page.getByRole('button', { name: 'Ouvrir le menu', exact: true }).click()
+  await expect(page.getByRole('navigation', { name: isMobile ? 'Navigation mobile' : 'Navigation principale', exact: true }).getByRole('link', { name: 'Mon accueil', exact: true })).toBeVisible()
 })
 
 test('numbering is configured and previewed by responsible service', async ({ page }) => {

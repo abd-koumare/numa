@@ -1,20 +1,13 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { CssBaseline, ThemeProvider } from '@mui/material'
 import { App } from './App'
-import { numaTheme } from './theme'
 import { AUTH_STORAGE_KEY, restoreOidcReturnTo, sanitizeReturnTo, serializeDemoAuthSession } from './AuthContext'
 
 function renderApp(path = '/', authenticated = true) {
   if (authenticated) window.localStorage.setItem(AUTH_STORAGE_KEY, serializeDemoAuthSession('2026-08-15T12:00:00.000Z'))
   else window.localStorage.removeItem(AUTH_STORAGE_KEY)
   window.history.pushState({}, '', path)
-  return render(
-    <ThemeProvider theme={numaTheme}>
-      <CssBaseline />
-      <App />
-    </ThemeProvider>,
-  )
+  return render(<App />)
 }
 
 describe('NUMA application shell', () => {
@@ -33,7 +26,7 @@ describe('NUMA application shell', () => {
     expect(screen.getAllByText('Courriers internes').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Courriers externes').length).toBeGreaterThan(0)
     expect(screen.getByText('© 2026 NUMA — Tous droits réservés à Koogin SAS')).toBeInTheDocument()
-    expect(screen.getByText('Prototype UI v0.3.0')).toBeInTheDocument()
+    expect(screen.getByText('Interface v0.3.0')).toBeInTheDocument()
   })
 
   it('shows the global legal footer on public identity screens', () => {
@@ -41,7 +34,7 @@ describe('NUMA application shell', () => {
 
     expect(screen.getByTestId('app-footer')).toBeInTheDocument()
     expect(screen.getByText('© 2026 NUMA — Tous droits réservés à Koogin SAS')).toBeInTheDocument()
-    expect(screen.getByText('Prototype UI v0.3.0')).toBeInTheDocument()
+    expect(screen.getByText('Interface v0.3.0')).toBeInTheDocument()
   })
 
   it('redirects anonymous visitors to the login page and preserves their destination', () => {

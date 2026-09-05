@@ -1,7 +1,10 @@
 .git
 .idea
 .env
+.env.*
 .venv
+offline-kit
+certificates
 node_modules
 dist
 coverage

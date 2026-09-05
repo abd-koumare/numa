@@ -147,7 +147,7 @@ services:
       keycloak: { condition: service_healthy }
       migrate: { condition: service_completed_successfully }
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; r=urllib.request.Request('http://127.0.0.1:8000/api/v1/health/', headers={'X-Forwarded-Proto':'https'}); urllib.request.urlopen(r, timeout=5)"]
+      test: ["CMD", "python", "-c", "import urllib.request; r=urllib.request.Request('http://127.0.0.1:8000/api/v1/health/', headers={'Host':'api','X-Forwarded-Proto':'https'}); urllib.request.urlopen(r, timeout=5)"]
       interval: 10s
       timeout: 6s
       retries: 30

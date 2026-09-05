@@ -429,6 +429,9 @@ def compile_configuration(kind: str, data, schema_version: int = CURRENT_SCHEMA_
         workflow_errors, compiled = _validate_workflow(data, allow_legacy=allow_legacy)
         errors.extend(workflow_errors)
     elif kind == "page":
+        audience = data.get("audience", [])
+        if not isinstance(audience, list) or not all(isinstance(role, str) and _valid_slug(role) for role in audience):
+            errors.append(_error("audience", "L’audience doit contenir des identifiants de rôles."))
         blocks = data.get("blocks", [])
         if not isinstance(blocks, list):
             errors.append(_error("blocks", "Les blocs doivent être une liste."))
@@ -438,6 +441,15 @@ def compile_configuration(kind: str, data, schema_version: int = CURRENT_SCHEMA_
                     errors.append(_error(f"blocks.{index}.type", "Bloc non autorisé."))
                 elif block.get("source") and block["source"] not in ALLOWED_PAGE_SOURCES:
                     errors.append(_error(f"blocks.{index}.source", "Source de données non autorisée."))
+                if isinstance(block, dict):
+                    links = block.get("links", []) if block.get("type") == "link-list" else [block] if block.get("type") == "button" else []
+                    if not isinstance(links, list):
+                        errors.append(_error(f"blocks.{index}.links", "Les liens doivent être une liste."))
+                        continue
+                    for link in links:
+                        path = link.get("path", "") if isinstance(link, dict) else ""
+                        if not isinstance(path, str) or not path.startswith("/") or path.startswith("//") or "\\" in path or any(ord(char) < 32 for char in path):
+                            errors.append(_error(f"blocks.{index}.path", "La destination doit être un chemin interne à NUMA."))
     elif kind == "template":
         template_type = data.get("template_type")
         if template_type is None:

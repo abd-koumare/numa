@@ -5,6 +5,8 @@ NUMA est une plateforme configurable de gestion des courriers et processus méti
 ## Documentation
 
 - [Guide simple des images Docker et de leur configuration](docs/docker-images-and-setup.md)
+- [Procédure de déploiement sur Ubuntu Server 24.04 LTS](docs/ubuntu-24-production-deployment.md)
+- [Audit et procédure de vérification de la configuration](docs/configuration-audit.md)
 
 ## Démarrage local
 

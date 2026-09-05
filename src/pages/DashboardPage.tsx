@@ -7,6 +7,7 @@ import { Link as RouterLink } from 'react-router-dom'
 import { API_DATA_ENABLED } from '../api/client'
 import { useDashboard, type DashboardPeriod } from '../api/operations'
 import { useAuth } from '../app/AuthContext'
+import { useSiteSettings } from '../app/SiteSettingsContext'
 import { StatusChip } from '../components/StatusChip'
 import { activities, chartData, registries, tasks } from '../data/dashboard'
 import type { ChartPeriod } from '../types/ui'
@@ -25,6 +26,17 @@ const apiPeriodLabels: Record<DashboardPeriod, string> = {
   '7d': '7 jours',
   '4w': '4 semaines',
   '12m': '12 mois',
+}
+
+function ConfiguredHomeBanner() {
+  const { branding } = useSiteSettings()
+  if (!branding.bannerUrl.trim()) return null
+  return <Box
+    component="img"
+    src={branding.bannerUrl}
+    alt={`Bannière ${branding.organizationName}`}
+    sx={{ display: 'block', width: '100%', maxHeight: 260, objectFit: 'cover', borderRadius: 1.5, border: '1px solid', borderColor: 'divider' }}
+  />
 }
 
 function formatApiSeriesLabel(value: string, period: DashboardPeriod) {
@@ -70,6 +82,7 @@ function DemoDashboardPage() {
   return <Box sx={{ maxWidth: 1400, mx: 'auto', px: { xs: 2, sm: 3, lg: 4 }, py: { xs: 3, md: 4 } }}>
     <Stack direction={{ xs: 'column', sm: 'row' }} alignItems={{ sm: 'center' }} justifyContent="space-between" spacing={2} sx={{ mb: 2.5 }}><Box><Typography component="h1" variant="h1">Bonjour, Kader</Typography><Typography color="text.secondary" variant="body2" sx={{ mt: 0.5 }}>Samedi 15 août 2026 — Instances actives : Interne 2026, Externe 2026</Typography></Box><Button component={RouterLink} to="/courriers/nouveau" variant="contained" startIcon={<Add />}>Nouveau courrier</Button></Stack>
     <Stack spacing={2}>
+      <ConfiguredHomeBanner />
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', lg: 'repeat(4, 1fr)' }, gap: 1.5 }}>{[['Courriers actifs', 428], ['À traiter', 12], ['En validation', 8], ['Signés cette semaine', 34]].map(([label, value]) => <Card key={String(label)} sx={{ p: 2.25, borderTop: '3px solid', borderTopColor: 'primary.main' }}><Typography variant="overline" color="text.secondary">{label}</Typography><Typography variant="h1" sx={{ mt: 0.75, fontSize: '1.8rem' }}>{value}</Typography></Card>)}</Box>
       <DemoCorrespondenceChart />
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1.35fr 1fr' }, gap: 2 }}>
@@ -90,6 +103,7 @@ function ApiDashboardPage() {
     <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={2} sx={{ mb: 2.5 }}><Box><Typography component="h1" variant="h1">Bonjour, {session?.user.name.split(' ')[0] ?? 'Utilisateur'}</Typography><Typography color="text.secondary" variant="body2" sx={{ mt: 0.5 }}>{new Intl.DateTimeFormat('fr-FR', { dateStyle: 'full' }).format(new Date())} · données de votre périmètre</Typography></Box><Button component={RouterLink} to="/courriers/nouveau" variant="contained" startIcon={<Add />}>Nouveau courrier</Button></Stack>
     {error ? <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert> : null}
     {loading ? <Box sx={{ py: 10, textAlign: 'center' }}><CircularProgress /></Box> : <Stack spacing={2}>
+      <ConfiguredHomeBanner />
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', lg: 'repeat(5, 1fr)' }, gap: 1.5 }}>{[
         ['Courriers accessibles', data.metrics.total, 'primary.dark'], ['À traiter', data.metrics.to_process, 'warning.main'],
         ['En validation', data.metrics.in_validation, 'primary.main'], ['Validés', data.metrics.validated, 'success.main'], ['En retard', data.metrics.overdue, 'error.main'],

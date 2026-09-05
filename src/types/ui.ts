@@ -137,7 +137,8 @@ export type SiteBrandingSettings = {
   bannerUrl: string
   fontFamily: 'NUMA' | 'Organisation'
   footerText: string
-  defaultHome: 'dashboard' | 'tasks' | 'correspondence'
+  defaultHome: 'dashboard' | 'tasks' | 'correspondence' | 'page'
+  homePageSlug?: string
 }
 
 export type CounterScope =

@@ -15,7 +15,7 @@ export function AppFooter({ variant = 'default' }: { variant?: 'default' | 'inve
         sx={{ maxWidth: 1400, mx: 'auto', px: { xs: 2, sm: 3, lg: 4 }, py: 2.5, borderTop: '1px solid', borderColor: inverse ? 'rgba(255,255,255,.16)' : 'divider' }}
       >
         <Typography variant="caption" color="inherit">© 2026 NUMA — {branding.footerText}</Typography>
-        <Typography variant="caption" color="inherit">Prototype UI v{UI_VERSION}</Typography>
+        <Typography variant="caption" color="inherit">Interface v{UI_VERSION}</Typography>
       </Stack>
     </Box>
   )

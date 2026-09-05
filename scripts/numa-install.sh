@@ -6,7 +6,13 @@ ENV_FILE="${NUMA_ENV_FILE:-$ROOT_DIR/.env.production}"
 [[ "$ENV_FILE" == /* ]] || ENV_FILE="$ROOT_DIR/$ENV_FILE"
 export NUMA_ENV_FILE="$ENV_FILE"
 DOMAIN="${1:-numa.local}"
-VERSION="${NUMA_VERSION:-1.0.0}"
+VERSION="${NUMA_VERSION:-}"
+if [[ -z "$VERSION" && -f "$ROOT_DIR/BUILD-INFO.txt" ]]; then
+  VERSION="$(sed -n 's/^version=//p' "$ROOT_DIR/BUILD-INFO.txt")"
+fi
+VERSION="${VERSION:-1.0.0}"
+[[ "$VERSION" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]] || { printf 'Version Docker invalide.\n' >&2; exit 2; }
+[[ "$DOMAIN" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ ]] || { printf 'Nom DNS invalide.\n' >&2; exit 2; }
 
 random_hex() { openssl rand -hex "$1"; }
 fernet_key() { openssl rand -base64 32 | tr '+/' '-_' | tr -d '\n'; }

@@ -862,6 +862,15 @@ def transition_correspondence(correspondence: Correspondence, action: str, actor
         if workflow:
             if action == "validate":
                 task = _advance_workflow(workflow, item, actor, action, comment)
+                next_step = _workflow_step(workflow.context, workflow.current_step)
+                if (
+                    workflow.status == WorkflowInstance.Status.RUNNING
+                    and next_step
+                    and next_step.get("kind") in {"validation", "approval"}
+                ):
+                    # Further approvals must remain actionable before signing.
+                    item.status = Correspondence.Status.IN_VALIDATION
+                    item.save(update_fields=["status"])
             elif action in {"reject", "cancel"}:
                 task = _terminate_workflow(workflow, actor, action, target_status, comment)
             elif action == "archive":

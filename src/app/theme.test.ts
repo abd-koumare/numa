@@ -1,6 +1,13 @@
-import { numaTheme } from './theme'
+import { createNumaTheme, numaTheme } from './theme'
 
 describe('NUMA theme', () => {
+  it('applies organization colors and fonts', () => {
+    const theme = createNumaTheme({ primaryColor: '#663399', accentColor: '#008800', fontFamily: 'Organisation' })
+    expect(theme.palette.primary.main).toBe('#663399')
+    expect(theme.palette.accent.main).toBe('#008800')
+    expect(theme.typography.fontFamily).toContain('system-ui')
+    expect(theme.typography.h1.fontFamily).not.toContain('Sora')
+  })
   it('uses the Markdown brand tokens', () => {
     expect(numaTheme.palette.primary.main).toBe('#123E7C')
     expect(numaTheme.palette.primary.dark).toBe('#0B2447')

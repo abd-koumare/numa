@@ -1,4 +1,4 @@
-import { alpha, createTheme } from '@mui/material/styles'
+import { alpha, createTheme, darken } from '@mui/material/styles'
 
 declare module '@mui/material/styles' {
   interface Theme {
@@ -38,18 +38,31 @@ declare module '@mui/material/styles' {
   }
 }
 
-const primary = '#123E7C'
+export type NumaThemeSettings = {
+  primaryColor?: string
+  accentColor?: string
+  fontFamily?: 'NUMA' | 'Organisation'
+}
 
-export const numaTheme = createTheme({
+export function createNumaTheme(settings: NumaThemeSettings = {}) {
+  const primary = settings.primaryColor ?? '#123E7C'
+  const accent = settings.accentColor ?? '#20C4C7'
+  const organizationFont = 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+  const bodyFont = settings.fontFamily === 'Organisation'
+    ? organizationFont
+    : '"Public Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+  const headingFont = settings.fontFamily === 'Organisation' ? organizationFont : 'Sora, system-ui, sans-serif'
+
+  return createTheme({
   fontFamilies: {
-    heading: 'Sora, system-ui, sans-serif',
-    body: '"Public Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    heading: headingFont,
+    body: bodyFont,
     mono: '"IBM Plex Mono", "SFMono-Regular", Consolas, monospace',
   },
   palette: {
     mode: 'light',
     primary: { main: primary, dark: '#0B2447', contrastText: '#FFFFFF' },
-    accent: { main: '#20C4C7', dark: '#087E8B', contrastText: '#0B2447' },
+    accent: { main: accent, dark: darken(accent, 0.3), contrastText: '#0B2447' },
     background: { default: '#F6F8FC', paper: '#FFFFFF' },
     text: { primary: '#172033', secondary: '#64748B', disabled: '#94A3B8' },
     divider: '#E2E8F0',
@@ -65,10 +78,10 @@ export const numaTheme = createTheme({
     },
   },
   typography: {
-    fontFamily: '"Public Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-    h1: { fontFamily: 'Sora, system-ui, sans-serif', fontSize: '1.75rem', fontWeight: 700, lineHeight: 1.2, letterSpacing: '-0.025em' },
-    h2: { fontFamily: 'Sora, system-ui, sans-serif', fontSize: '1.35rem', fontWeight: 700, lineHeight: 1.25, letterSpacing: '-0.02em' },
-    h3: { fontFamily: 'Sora, system-ui, sans-serif', fontSize: '1rem', fontWeight: 700, lineHeight: 1.35 },
+    fontFamily: bodyFont,
+    h1: { fontFamily: headingFont, fontSize: '1.75rem', fontWeight: 700, lineHeight: 1.2, letterSpacing: '-0.025em' },
+    h2: { fontFamily: headingFont, fontSize: '1.35rem', fontWeight: 700, lineHeight: 1.25, letterSpacing: '-0.02em' },
+    h3: { fontFamily: headingFont, fontSize: '1rem', fontWeight: 700, lineHeight: 1.35 },
     button: { fontWeight: 600, textTransform: 'none' },
     body1: { lineHeight: 1.6 },
     body2: { lineHeight: 1.5 },
@@ -81,7 +94,7 @@ export const numaTheme = createTheme({
         html: { minHeight: '100%', backgroundColor: '#F6F8FC' },
         body: { minHeight: '100%', margin: 0, backgroundColor: '#F6F8FC' },
         '#root': { minHeight: '100vh' },
-        '::selection': { backgroundColor: alpha('#20C4C7', 0.25) },
+        '::selection': { backgroundColor: alpha(accent, 0.25) },
         ':focus-visible': { outline: `3px solid ${alpha('#2563EB', 0.42)}`, outlineOffset: 2 },
       },
     },
@@ -100,4 +113,7 @@ export const numaTheme = createTheme({
       styleOverrides: { root: { fontWeight: 600 } },
     },
   },
-})
+  })
+}
+
+export const numaTheme = createNumaTheme()

@@ -30,6 +30,7 @@ type PublicConfiguration = {
     default_home: SiteBrandingSettings['defaultHome']; logo_file_name?: string | null
     logo_mime_type?: SiteBrandingSettings['logoMimeType']; banner_url?: string
     font_family?: SiteBrandingSettings['fontFamily']
+    home_page_slug?: string
   }
   numbering?: Partial<NumberingSettings>
 }
@@ -66,6 +67,7 @@ function brandingFromPublic(data: PublicConfiguration): SiteBrandingSettings {
     primaryColor: organization.primary_color, accentColor: organization.accent_color,
     bannerUrl: organization.banner_url ?? '', fontFamily: organization.font_family ?? 'NUMA',
     footerText: organization.footer_text, defaultHome: organization.default_home,
+    homePageSlug: organization.home_page_slug ?? '',
   }
 }
 
@@ -84,6 +86,7 @@ export function SiteSettingsProvider({ children }: { children: ReactNode }) {
       .then((configuration) => {
         if (active) setState({ branding: brandingFromPublic(configuration), numbering: { ...defaultNumberingSettings, ...(configuration.numbering ?? {}) } })
       })
+      .catch(() => undefined)
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
   }, [])
@@ -110,7 +113,7 @@ export function SiteSettingsProvider({ children }: { children: ReactNode }) {
           primary_color: branding.primaryColor, accent_color: branding.accentColor,
           logo_data_url: branding.logoDataUrl ?? '', favicon_data_url: branding.faviconDataUrl ?? '',
           footer_text: branding.footerText, default_home: branding.defaultHome,
-          settings: { ...current.data.settings, branding: { ...existingBranding, logoFileName: branding.logoFileName, logoMimeType: branding.logoMimeType, bannerUrl: branding.bannerUrl, fontFamily: branding.fontFamily } },
+          settings: { ...current.data.settings, branding: { ...existingBranding, logoFileName: branding.logoFileName, logoMimeType: branding.logoMimeType, bannerUrl: branding.bannerUrl, fontFamily: branding.fontFamily, homePageSlug: branding.homePageSlug ?? '' } },
         }),
       })
     }

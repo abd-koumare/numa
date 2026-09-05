@@ -10,6 +10,7 @@ import type {
   RuleDefinition,
   UserRole,
 } from '../types/ui'
+import { parseRuleAction, parseRuleCondition, ruleActionToText, ruleConditionToText, updateRuleData } from './ruleDsl'
 
 const STORAGE_KEY = 'numa.prototype-data.v1'
 
@@ -148,17 +149,17 @@ function mapApiUser(user: ApiUser): DirectoryUser {
 }
 
 function mapConfiguration(definition: ApiConfiguration): ListDefinition | RuleDefinition | null {
-  const version = definition.current_version ?? definition.latest_version
+  const version = definition.latest_version ?? definition.current_version
   if (!version) return null
   const data = version.data
-  const status = definition.current_version ? 'Publié' : version.state === 'archived' ? 'Archivé' : 'Brouillon'
+  const status = version.state === 'published' ? 'Publié' : version.state === 'archived' ? 'Archivé' : 'Brouillon'
   if (definition.kind === 'list') {
     const periods: Record<string, ListDefinition['periodicity']> = { none: 'Aucune', yearly: 'Annuelle', monthly: 'Mensuelle', quarterly: 'Trimestrielle', custom: 'Personnalisée' }
     return { id: definition.id, name: definition.name, description: definition.description, icon: String(data.icon ?? 'Registre'), periodicity: periods[String(data.periodicity)] ?? 'Aucune', status, version: version.version, itemCount: Number(data.itemCount ?? 0) }
   }
   if (definition.kind === 'rule') {
     const actionValue = Array.isArray(data.actions) ? data.actions[0] : data.action
-    return { id: definition.id, name: definition.name, scope: String(data.scope ?? ''), condition: typeof data.condition === 'string' ? data.condition : JSON.stringify(data.condition ?? {}), action: typeof actionValue === 'string' ? actionValue : String((actionValue as { label?: string; type?: string } | undefined)?.label ?? (actionValue as { type?: string } | undefined)?.type ?? ''), status: status === 'Archivé' ? 'Erreur' : status, version: version.version }
+    return { id: definition.id, name: definition.name, scope: String(data.scope ?? ''), condition: ruleConditionToText(data.condition), action: ruleActionToText(actionValue), status: status === 'Archivé' ? 'Erreur' : status, version: version.version }
   }
   return null
 }
@@ -272,7 +273,7 @@ export function PrototypeDataProvider({ children }: { children: ReactNode }) {
     addRule: async (rule) => {
       if (!API_DATA_ENABLED) { setState((current) => ({ ...current, rules: [rule, ...current.rules] })); return rule }
       const slug = `rule-${Date.now()}`
-      const definition = await saveConfiguration('rule', slug, rule.name, { scope: rule.scope, condition: rule.condition, actions: [{ type: 'display', label: rule.action }] }, rule.status === 'Publié')
+      const definition = await saveConfiguration('rule', slug, rule.name, { scope: rule.scope, condition: parseRuleCondition(rule.condition), events: ['submit'], actions: [parseRuleAction(rule.action)] }, rule.status === 'Publié')
       const mapped = { ...rule, id: definition.id, version: definition.latest_version?.version ?? 1 }
       setState((current) => ({ ...current, rules: [mapped, ...current.rules] })); return mapped
     },
@@ -282,8 +283,13 @@ export function PrototypeDataProvider({ children }: { children: ReactNode }) {
         const detail = await apiFetch<ApiConfiguration>(`/configurations/${id}/`)
         if (!detail.latest_version) throw new Error('Version de règle introuvable.')
         const merged = { ...current, ...patch }
-        const updated = await apiFetch<ApiConfiguration>(`/configurations/${id}/`, { method: 'PATCH', headers: ifMatch(detail.latest_version.version), body: JSON.stringify({ name: merged.name, data: { scope: merged.scope, condition: merged.condition, actions: [{ type: 'display', label: merged.action }] } }) })
-        if (merged.status === 'Publié' && updated.latest_version?.state === 'draft') await apiFetch(`/configurations/${id}/publish/`, { method: 'POST', headers: ifMatch(updated.latest_version.version), body: JSON.stringify({}) })
+        let updated = await apiFetch<ApiConfiguration>(`/configurations/${id}/`, { method: 'PATCH', headers: ifMatch(detail.latest_version.version), body: JSON.stringify({ name: merged.name, data: updateRuleData(detail.latest_version.data, merged) }) })
+        const draft = mapConfiguration(updated) as RuleDefinition
+        setState((value) => ({ ...value, rules: value.rules.map((rule) => rule.id === id ? draft : rule) }))
+        if (merged.status === 'Publié' && updated.latest_version?.state === 'draft') updated = await apiFetch<ApiConfiguration>(`/configurations/${id}/publish/`, { method: 'POST', headers: ifMatch(updated.latest_version.version), body: JSON.stringify({}) })
+        const mapped = mapConfiguration(updated) as RuleDefinition
+        setState((value) => ({ ...value, rules: value.rules.map((rule) => rule.id === id ? mapped : rule) }))
+        return
       }
       setState((value) => ({ ...value, rules: value.rules.map((rule) => rule.id === id ? { ...rule, ...patch } : rule) }))
     },
