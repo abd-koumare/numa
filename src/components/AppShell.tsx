@@ -303,7 +303,7 @@ export function AppShell({ children }: AppShellProps) {
             </IconButton>
           </Tooltip>
           <Tooltip title="Aide">
-            <IconButton aria-label="Aide" sx={{ display: { xs: 'none', sm: 'inline-flex' }, border: { md: '1px solid' }, borderColor: { md: 'divider' }, borderRadius: 1 }}>
+            <IconButton component={RouterLink} to="/aide" aria-label="Aide" sx={{ border: { md: '1px solid' }, borderColor: { md: 'divider' }, borderRadius: 1 }}>
               <HelpOutline />
             </IconButton>
           </Tooltip>

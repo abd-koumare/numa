@@ -31,6 +31,8 @@ import { FieldFormBuilderPage, PagesCatalogPage, TemplateDetailPage, TemplatesCa
 import { CompleteAuditPage, CompleteBackupsPage, CompleteOperationsPage } from '../pages/GovernancePages'
 import { NotificationsPage } from '../pages/NotificationsPage'
 import { PublishedPage } from '../pages/PublishedPage'
+import { HelpPage } from '../pages/HelpPage'
+import { normalizeCorrespondencePath } from './correspondencePaths'
 
 function AnonymousOnlyRoute({ children }: { children: ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth()
@@ -54,12 +56,19 @@ function ProtectedApplication() {
   return <PrototypeDataProvider><AppShell><ShellRoutes /></AppShell></PrototypeDataProvider>
 }
 
+function LegacyCorrespondenceRedirect() {
+  const location = useLocation()
+  return <Navigate to={`${normalizeCorrespondencePath(location.pathname)}${location.search}${location.hash}`} replace />
+}
+
 function ShellRoutes() {
   return (
     <Routes>
           <Route path="/" element={<ConfiguredHomePage />} />
           <Route path="/pages/:slug" element={<PublishedPage />} />
           <Route path="/courriers" element={<CorrespondenceOverviewPage />} />
+          <Route path="/courriers/externals/*" element={<LegacyCorrespondenceRedirect />} />
+          <Route path="/courriers/internals/*" element={<LegacyCorrespondenceRedirect />} />
           <Route path="/courriers/nouveau" element={<CorrespondenceFormPage />} />
           <Route path="/courriers/internes" element={<InternalRegistryPage />} />
           <Route path="/courriers/internes/import" element={<ImportWizardPage registryType="internal" />} />
@@ -85,6 +94,7 @@ function ShellRoutes() {
           <Route path="/taches" element={<TasksPage />} />
           <Route path="/activite" element={<ActivityPage />} />
           <Route path="/notifications" element={<NotificationsPage />} />
+          <Route path="/aide" element={<HelpPage />} />
           <Route path="/recherche" element={<GlobalSearchPage />} />
           <Route path="/profil" element={<ProfilePage />} />
           <Route path="/administration" element={<AdministrationOverviewPage />} />

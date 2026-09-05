@@ -1,4 +1,4 @@
-import { type PointerEvent as ReactPointerEvent, type ReactNode, useRef, useState } from 'react'
+import { type PointerEvent as ReactPointerEvent, type ReactNode, useEffect, useRef, useState } from 'react'
 import ArrowBack from '@mui/icons-material/ArrowBack'
 import Autorenew from '@mui/icons-material/Autorenew'
 import BadgeOutlined from '@mui/icons-material/BadgeOutlined'
@@ -32,7 +32,7 @@ import {
   Typography,
 } from '@mui/material'
 import { Link as RouterLink, useLocation, useParams } from 'react-router-dom'
-import { API_DATA_ENABLED } from '../api/client'
+import { apiFetch, API_DATA_ENABLED } from '../api/client'
 import { signCorrespondence, useCorrespondence } from '../api/correspondences'
 import type { SignatureLevel } from '../types/ui'
 import { externalCorrespondences } from '../data/correspondences'
@@ -69,6 +69,22 @@ export function SignaturePage() {
   const [processing, setProcessing] = useState(false)
   const [signed, setSigned] = useState(false)
   const [signatureError, setSignatureError] = useState('')
+  const [access, setAccess] = useState<{ can_sign: boolean; reason: string; assignee_name: string } | null>(null)
+  const [accessError, setAccessError] = useState('')
+
+  useEffect(() => {
+    if (!API_DATA_ENABLED) return
+    const controller = new AbortController()
+    setAccess(null); setAccessError('')
+    const refreshAccess = () => {
+      apiFetch<{ can_sign: boolean; reason: string; assignee_name: string }>(`/correspondences/${id}/signature-access/`, { signal: controller.signal })
+        .then((value) => { if (!controller.signal.aborted) { setAccess(value); setAccessError('') } })
+        .catch((reason) => { if (!controller.signal.aborted) { setAccess(null); setAccessError(reason instanceof Error ? reason.message : 'Vérification des habilitations impossible.') } })
+    }
+    refreshAccess()
+    window.addEventListener('focus', refreshAccess)
+    return () => { controller.abort(); window.removeEventListener('focus', refreshAccess) }
+  }, [id, apiItem?.row_version])
 
   const canvasPoint = (event: ReactPointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current!
@@ -163,11 +179,12 @@ export function SignaturePage() {
       <Button component={RouterLink} to={`${basePath}/${id}`} startIcon={<ArrowBack />} sx={{ px: 0, mb: 1 }}>Retour à la fiche</Button>
       <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ md: 'flex-start' }} spacing={2.5} sx={{ mb: 2.5 }}>
         <Box><Typography component="h1" variant="h1">Signature électronique</Typography><Typography variant="body2" color="text.secondary" sx={{ mt: 0.75 }}><Box component="span" sx={{ fontFamily: 'IBM Plex Mono, monospace' }}>{correspondence.reference}</Box> — {correspondence.subject} · version {documentVersion?.version ?? 3}</Typography></Box>
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}><Button component={RouterLink} to={`${basePath}/${id}`} variant="outlined">Annuler</Button><Button variant="contained" startIcon={processing ? <CircularProgress size={18} color="inherit" /> : <DrawOutlined />} disabled={!consent || processing || (API_DATA_ENABLED && (!documentVersion || apiItem?.status !== 'validated')) || (level === 'digital' && certificateState !== 'valid')} onClick={() => setConfirmOpen(true)}>{processing ? 'Signature en cours…' : 'Apposer la signature'}</Button></Stack>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}><Button component={RouterLink} to={`${basePath}/${id}`} variant="outlined">Annuler</Button><Button variant="contained" startIcon={processing ? <CircularProgress size={18} color="inherit" /> : <DrawOutlined />} disabled={!consent || processing || (API_DATA_ENABLED && (!documentVersion || apiItem?.status !== 'validated' || !access?.can_sign)) || (level === 'digital' && certificateState !== 'valid')} onClick={() => setConfirmOpen(true)}>{processing ? 'Signature en cours…' : 'Apposer la signature'}</Button></Stack>
       </Stack>
 
       {signatureError ? <Alert severity="error" onClose={() => setSignatureError('')} sx={{ mb: 2.5 }}>{signatureError}</Alert> : null}
-      {apiItem && apiItem.status !== 'validated' ? <Alert severity="warning" sx={{ mb: 2.5 }}>Ce courrier doit être validé avant de pouvoir être signé.</Alert> : null}
+      {accessError ? <Alert severity="error" sx={{ mb: 2.5 }}>{accessError}</Alert> : null}
+      {access && !access.can_sign ? <Alert severity="warning" sx={{ mb: 2.5 }}>{access.reason}{access.assignee_name ? <Typography variant="body2" sx={{ mt: 0.5 }}>Responsable actuel : {access.assignee_name}.</Typography> : null}</Alert> : null}
       <Alert severity="info" icon={<LockOutlined />} sx={{ mb: 2.5 }}>Vous signez l’empreinte de la <strong>version {documentVersion?.version ?? 3}</strong>. Toute modification ultérieure créera une nouvelle version non couverte par cette signature.</Alert>
 
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: 'minmax(480px, .9fr) minmax(520px, 1.1fr)' }, gap: 2.5, alignItems: 'start' }}>

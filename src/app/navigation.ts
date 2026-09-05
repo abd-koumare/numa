@@ -59,6 +59,7 @@ export const routeContexts: RouteContext[] = [
   { path: '/taches', breadcrumbs: ['Courriers', 'Mes tâches'], context: 'Actions requises' },
   { path: '/activite', breadcrumbs: ['Accueil', 'Activité'], context: 'Journal récent' },
   { path: '/notifications', breadcrumbs: ['Accueil', 'Notifications'], context: 'Centre de notifications' },
+  { path: '/aide', breadcrumbs: ['Accueil', 'Aide'], context: 'Guide d’utilisation' },
   { path: '/recherche', breadcrumbs: ['Recherche'], context: 'Recherche globale' },
   { path: '/profil', breadcrumbs: ['Profil'], context: 'Préférences personnelles' },
   { path: '/administration/site', breadcrumbs: ['Administration', 'Identité visuelle'], context: 'Personnalisation du site' },

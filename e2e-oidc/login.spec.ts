@@ -11,5 +11,6 @@ test('Keycloak authenticates the demo user and the API registry is displayed', a
   await expect(page).toHaveURL(/localhost:5173\/courriers\/externes/)
   await expect(page.getByRole('heading', { name: 'Courriers externes 2026' })).toBeVisible()
   const registry = page.getByRole('table', { name: 'Courriers externes 2026' })
+  await page.getByRole('searchbox', { name: 'Rechercher dans le registre' }).fill('Demande de partenariat technique')
   await expect(registry.getByText('Demande de partenariat technique', { exact: true }).first()).toBeVisible()
 })

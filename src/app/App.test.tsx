@@ -316,4 +316,48 @@ describe('NUMA application shell', () => {
     await user.click(screen.getByRole('tab', { name: /Non lues/ }))
     expect(screen.getByRole('heading', { name: 'Aucune notification' })).toBeInTheDocument()
   })
+
+  it.each(['externals', 'internals'])('redirects old %s links and preserves query and fragment', (registry) => {
+    const translated = registry === 'externals' ? 'externes' : 'internes'
+    const id = registry === 'externals' ? 'ext-0040-2026' : 'int-0187-2026'
+    renderApp(`/courriers/${registry}/${id}?source=email#documents`)
+
+    expect(window.location.pathname).toBe(`/courriers/${translated}/${id}`)
+    expect(window.location.search).toBe('?source=email')
+    expect(window.location.hash).toBe('#documents')
+    expect(screen.queryByRole('heading', { name: 'Page introuvable' })).not.toBeInTheDocument()
+  })
+
+  it.each(['page', 'menu'])('opens a stored legacy notification from the %s and marks it read', async (entryPoint) => {
+    const user = userEvent.setup()
+    window.localStorage.setItem('numa.prototype-data.v1', JSON.stringify({ notifications: [{
+      id: 'old-notification', title: 'Ancienne validation', detail: 'Courrier à vérifier',
+      createdAt: 'Hier', kind: 'validation', read: false, path: '/courriers/externals/ext-0040-2026',
+    }] }))
+    renderApp(entryPoint === 'page' ? '/notifications' : '/')
+    if (entryPoint === 'menu') await user.click(screen.getByRole('button', { name: 'Notifications' }))
+
+    const notification = screen.getByRole(entryPoint === 'menu' ? 'menuitem' : 'link', { name: /Ancienne validation/ })
+    expect(notification).toHaveAttribute('href', '/courriers/externes/ext-0040-2026')
+    await user.click(notification)
+
+    expect(window.location.pathname).toBe('/courriers/externes/ext-0040-2026')
+    expect(screen.queryByRole('heading', { name: 'Page introuvable' })).not.toBeInTheDocument()
+    expect(JSON.parse(window.localStorage.getItem('numa.prototype-data.v1')!).notifications[0].read).toBe(true)
+  })
+
+  it('opens useful help from the toolbar and follows a guide action', async () => {
+    const user = userEvent.setup()
+    renderApp()
+    await user.click(screen.getByRole('link', { name: 'Aide' }))
+
+    expect(window.location.pathname).toBe('/aide')
+    expect(screen.getByRole('heading', { name: 'Aide et guide d’utilisation', level: 1 })).toBeInTheDocument()
+    expect(screen.getByRole('navigation', { name: 'Sommaire de l’aide' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Signer un courrier' })).toBeInTheDocument()
+    expect(screen.getByText(/sans effectuer les validations ou signatures demandées/)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('link', { name: 'Voir mes notifications' }))
+    expect(screen.getByRole('heading', { name: 'Notifications', level: 1 })).toBeInTheDocument()
+  })
 })

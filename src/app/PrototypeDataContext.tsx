@@ -11,6 +11,7 @@ import type {
   UserRole,
 } from '../types/ui'
 import { parseRuleAction, parseRuleCondition, ruleActionToText, ruleConditionToText, updateRuleData } from './ruleDsl'
+import { normalizeCorrespondencePath } from './correspondencePaths'
 
 const STORAGE_KEY = 'numa.prototype-data.v1'
 
@@ -108,7 +109,7 @@ function loadState(): PrototypeState {
       groups: stored.groups ?? defaultGroups,
       roles: stored.roles ?? defaultRoles,
       navigationEntries: stored.navigationEntries ?? defaultNavigation,
-      notifications: stored.notifications ?? defaultNotifications,
+      notifications: (stored.notifications ?? defaultNotifications).map((item) => ({ ...item, path: normalizeCorrespondencePath(item.path) })),
       lists: stored.lists ?? defaultLists,
       rules: stored.rules ?? defaultRules,
     }
@@ -205,7 +206,7 @@ export function PrototypeDataProvider({ children }: { children: ReactNode }) {
         groups: apiGroups.map((group) => ({ id: group.id, name: group.name, description: group.description, source: group.source === 'directory' ? 'Active Directory' : 'NUMA', memberIds: group.member_ids, roleIds: group.role_ids })),
         roles: apiRoles,
         navigationEntries: Array.isArray(navigation) ? navigation as NavigationEntry[] : defaultNavigation,
-        notifications: apiNotifications.map((item) => ({ id: item.id, title: item.title, detail: item.detail, createdAt: humanDate(item.created_at), kind: item.kind, read: item.read, path: item.path })),
+        notifications: apiNotifications.map((item) => ({ id: item.id, title: item.title, detail: item.detail, createdAt: humanDate(item.created_at), kind: item.kind, read: item.read, path: normalizeCorrespondencePath(item.path) })),
         lists: mapped.filter((item): item is ListDefinition => 'itemCount' in item),
         rules: mapped.filter((item): item is RuleDefinition => 'condition' in item),
       })

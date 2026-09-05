@@ -97,6 +97,8 @@ from .serializers import (
 )
 from .services import (
     assert_if_match,
+    assign_workflow_task,
+    correspondence_signature_access,
     correspondence_queryset_for,
     preview_reference,
     record_audit,
@@ -469,6 +471,10 @@ class CorrespondenceViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"])
     def archive(self, request, pk=None):
         return self._transition(request, "archive")
+
+    @action(detail=True, methods=["get"], url_path="signature-access")
+    def signature_access(self, request, pk=None):
+        return Response(correspondence_signature_access(self.get_object(), request.user))
 
     @extend_schema(request=SignatureRequestSerializer, responses=CorrespondenceSerializer)
     @action(detail=True, methods=["post"])
@@ -885,11 +891,7 @@ class WorkflowTaskViewSet(viewsets.ReadOnlyModelViewSet):
         profile = UserProfile.objects.select_related("user").filter(user_id=user_id, active=True, user__is_active=True).first()
         if profile is None:
             raise ValidationError({"user_id": "Utilisateur actif introuvable."})
-        before = {"assignee_id": task.assignee_id, "assignee_group_id": str(task.assignee_group_id or "")}
-        task.assignee = profile.user
-        task.assignee_group = None
-        task.save(update_fields=["assignee", "assignee_group"])
-        record_audit(actor=request.user, action="workflow.task.assigned", resource_type="workflow_task", resource_id=task.id, request=request, metadata={"reason": request.data.get("reason", "")}, before=before, after={"assignee_id": task.assignee_id, "assignee_group_id": None})
+        task = assign_workflow_task(task, profile.user, request.user, request=request, reason=request.data.get("reason", ""))
         return Response(self.get_serializer(task).data)
 
 

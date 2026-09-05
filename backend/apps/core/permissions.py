@@ -31,6 +31,7 @@ class CorrespondencePermission(BasePermission):
         "reopen": Capability.CORRESPONDENCE_REOPEN,
         "archive": Capability.CORRESPONDENCE_ARCHIVE,
         "sign": Capability.CORRESPONDENCE_SIGN,
+        "signature_access": Capability.CORRESPONDENCE_READ,
         "access_grants": Capability.CORRESPONDENCE_MANAGE_ACL,
         "replace_access_grants": Capability.CORRESPONDENCE_MANAGE_ACL,
     }

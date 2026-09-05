@@ -11,6 +11,7 @@ from rest_framework.exceptions import PermissionDenied
 
 from .capabilities import Capability, effective_capabilities, effective_role_slugs, get_profile, has_capability
 from .exceptions import PreconditionRequired, StaleVersion, StateConflict
+from .correspondence_paths import correspondence_path
 from .models import (
     AccessGroup,
     AccessRole,
@@ -523,6 +524,55 @@ def _grant_workflow_task_access(item: Correspondence, task: WorkflowTask, actor)
         )
 
 
+@transaction.atomic
+def assign_workflow_task(task: WorkflowTask, assignee, actor, *, request=None, reason=""):
+    item = Correspondence.objects.select_for_update().get(pk=task.workflow.correspondence_id)
+    task = WorkflowTask.objects.select_for_update().get(pk=task.pk)
+    if task.status not in {WorkflowTask.Status.TODO, WorkflowTask.Status.IN_PROGRESS}:
+        raise StateConflict("Une tâche terminée ne peut plus être déléguée.")
+    required = {
+        WorkflowTask.Kind.SIGNATURE: Capability.CORRESPONDENCE_SIGN,
+        WorkflowTask.Kind.VALIDATION: Capability.CORRESPONDENCE_VALIDATE,
+    }.get(task.kind)
+    if required and not has_capability(assignee, required):
+        raise serializers.ValidationError({"user_id": "Le nouveau responsable doit posséder le rôle ou les permissions nécessaires à cette tâche."})
+    before = {"assignee_id": task.assignee_id, "assignee_group_id": str(task.assignee_group_id or "")}
+    task.assignee = assignee
+    task.assignee_group = None
+    task.save(update_fields=["assignee", "assignee_group"])
+    _grant_workflow_task_access(item, task, actor)
+    record_audit(
+        actor=actor, action="workflow.task.assigned", resource_type="workflow_task", resource_id=task.id,
+        request=request, metadata={"reason": reason}, before=before,
+        after={"assignee_id": task.assignee_id, "assignee_group_id": None},
+    )
+    return task
+
+
+def correspondence_signature_access(item: Correspondence, user) -> dict:
+    workflow = WorkflowInstance.objects.filter(correspondence=item).first()
+    task = workflow.tasks.filter(
+        kind=WorkflowTask.Kind.SIGNATURE,
+        status__in=[WorkflowTask.Status.TODO, WorkflowTask.Status.IN_PROGRESS],
+    ).select_related("assignee", "assignee_group").first() if workflow else None
+    assignee_name = ""
+    if task:
+        assignee_name = (task.assignee.get_full_name() or task.assignee.username) if task.assignee else (task.assignee_group.name if task.assignee_group else "")
+    reason = ""
+    if not has_capability(user, Capability.CORRESPONDENCE_SIGN):
+        reason = "Votre rôle ne permet pas de signer. Un administrateur doit vous attribuer une habilitation de signature."
+    elif not has_correspondence_capability(user, item, Capability.CORRESPONDENCE_SIGN):
+        reason = "Votre rôle autorise la signature, mais vous ne disposez pas de cette habilitation sur ce courrier. Demandez la délégation de la tâche de signature."
+    elif item.status != Correspondence.Status.VALIDATED:
+        reason = "Ce courrier doit être validé avant de pouvoir être signé."
+    else:
+        try:
+            _assert_workflow_signature(workflow)
+        except StateConflict as exc:
+            reason = str(exc.detail)
+    return {"can_sign": not bool(reason), "reason": reason, "assignee_name": assignee_name}
+
+
 def _create_configured_task(workflow: WorkflowInstance, item: Correspondence, step: dict, actor) -> WorkflowTask:
     kind = {
         "validation": WorkflowTask.Kind.VALIDATION,
@@ -550,7 +600,7 @@ def _create_configured_task(workflow: WorkflowInstance, item: Correspondence, st
             recipient=task.assignee,
             kind=Notification.Kind.SIGNATURE if kind == WorkflowTask.Kind.SIGNATURE else Notification.Kind.VALIDATION,
             title="Signature demandée" if kind == WorkflowTask.Kind.SIGNATURE else "Validation demandée",
-            path=f"/courriers/{item.registry}s/{item.id}",
+            path=correspondence_path(item),
             data={"correspondence_id": str(item.id), "task_id": str(task.id)},
             defaults={
                 "detail": f"{item.reference or 'Brouillon'} · {item.subject}",
@@ -736,7 +786,7 @@ def apply_rule_side_effects(
                     kind=Notification.Kind.SYSTEM,
                     title=action.get("title") or "Règle métier déclenchée",
                     detail=action.get("detail") or f"{item.reference or 'Brouillon'} · {item.subject}",
-                    path=f"/courriers/{item.registry}s/{item.id}",
+                    path=correspondence_path(item),
                     data={"correspondence_id": str(item.id), "rule_version_id": str(version.id)},
                     email_requested=bool(action.get("email", False)),
                 )
@@ -917,7 +967,7 @@ def transition_correspondence(correspondence: Correspondence, action: str, actor
             kind=Notification.Kind.VALIDATION,
             title=f"Courrier {item.get_status_display().lower()}",
             detail=f"{item.reference} · {item.subject}",
-            path=f"/courriers/{item.registry}s/{item.id}",
+            path=correspondence_path(item),
             data={"correspondence_id": str(item.id)},
             email_requested=True,
         )
